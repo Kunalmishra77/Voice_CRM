@@ -1,0 +1,25 @@
+export const ENV_VARS = `
+Required Environment Variables for Real Data Integration:
+
+[Frontend - frontend/.env.local]
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+[Backend - backend/.env] (Optional if fetching directly from frontend)
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key (Only required if RLS prevents reads via ANON_KEY, never expose this to frontend)
+
+# Security / RLS Note:
+# For the frontend to read data securely using the anon key, you MUST enable Row Level Security (RLS) on both tables and create read policies.
+# 
+# Example Supabase RLS Policies for Anon Key (Read-Only):
+# 
+# 1. On 'whatsapp_conversations' table:
+# CREATE POLICY "Allow public read access" ON public.whatsapp_conversations FOR SELECT USING (true);
+#
+# 2. On 'lead_insights' table:
+# CREATE POLICY "Allow public read access" ON public.lead_insights FOR SELECT USING (true);
+#
+# If you prefer not to expose table data to anon keys, you should route all data fetching through the Express backend using the SERVICE_ROLE_KEY.
+`;

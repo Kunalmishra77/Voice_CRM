@@ -1,0 +1,6 @@
+export const CRM_CONFIG = {
+  ADVANCED_CRM: true, // Master feature flag
+  FOLLOW_UP_THRESHOLD_HOURS: 24,
+  URGENT_THRESHOLD_HOURS: 2,
+  SLA_TARGET_MINUTES: 30,
+};
