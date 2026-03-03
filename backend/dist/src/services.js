@@ -46,6 +46,9 @@ export const conversationService = {
             .range(from, to);
         if (error)
             throw error;
+        if (data && data.length > 0) {
+            console.log('📡 Sample Conversation Row:', data[0]);
+        }
         // Post-process to group by Session ID for the "Inbox" feel
         // In a real production app, this would be a View or RPC in Supabase
         const grouped = [];
@@ -167,20 +170,96 @@ export const leadService = {
 export const dashboardService = {
     getStats: async () => {
         const todayStr = new Date().toISOString().split('T')[0];
-        const [{ count: totalConvs }, { count: totalLeads }, { count: todaysConvs }, { count: todaysLeads }, { data: uniquePhonesData }] = await Promise.all([
+        const [qTotalConvs, qTotalLeads, qTodaysConvs, qTodaysLeads, qUniquePhones] = await Promise.all([
             supabase.from(CONVERSATIONS_TABLE).select('*', { count: 'exact', head: true }),
             supabase.from(INSIGHTS_TABLE).select('*', { count: 'exact', head: true }),
             supabase.from(CONVERSATIONS_TABLE).select('*', { count: 'exact', head: true }).gte(COLS.conv.date, todayStr),
             supabase.from(INSIGHTS_TABLE).select('*', { count: 'exact', head: true }).gte(COLS.insight.date, todayStr),
-            supabase.from(CONVERSATIONS_TABLE).select(COLS.conv.phone)
+            supabase.from(CONVERSATIONS_TABLE).select(`"${COLS.conv.phone}"`)
         ]);
-        const uniquePhones = new Set(uniquePhonesData?.map(item => item[COLS.conv.phone])).size;
+        if (qUniquePhones.error)
+            console.error('📡 Unique Phones Error:', qUniquePhones.error);
+        const uniquePhonesData = qUniquePhones.data || [];
+        if (uniquePhonesData.length > 0) {
+            console.log('📡 Sample Row for Phone Mapping:', uniquePhonesData[0]);
+        }
+        const uniquePhones = new Set(uniquePhonesData.map(item => {
+            const val = item[COLS.conv.phone];
+            return val ? String(val).trim() : null;
+        }).filter(Boolean)).size;
+        // Stage distribution
+        const { data: stages, error: stageError } = await supabase.from(INSIGHTS_TABLE).select(`"${COLS.insight.stage}"`);
+        if (stageError)
+            console.error('📡 Stage Distro Error:', stageError);
+        const stage_counts = (stages || []).reduce((acc, curr) => {
+            const s = curr[COLS.insight.stage] || 'Unknown';
+            acc[s] = (acc[s] || 0) + 1;
+            return acc;
+        }, {});
         return {
-            totalLeads: totalLeads || 0,
-            totalChats: totalConvs || 0,
-            todayChats: todaysConvs || 0,
-            newLeadsToday: todaysLeads || 0,
-            uniqueContacts: uniquePhones || 0
+            total_leads: qTotalLeads.count || 0,
+            total_conversations: qTotalConvs.count || 0,
+            todays_conversations: qTodaysConvs.count || 0,
+            todays_leads: qTodaysLeads.count || 0,
+            unique_phones: uniquePhones || 0,
+            stage_counts
         };
+    }
+};
+export const taskService = {
+    getTasks: async (filters) => {
+        let query = supabase.from('tasks').select('*');
+        if (filters.contact_phone)
+            query = query.eq('contact_phone', filters.contact_phone);
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error)
+            throw error;
+        return data;
+    },
+    createTask: async (task) => {
+        const { data, error } = await supabase.from('tasks').insert([task]).select().single();
+        if (error)
+            throw error;
+        return data;
+    },
+    updateTask: async (id, updates) => {
+        const { data, error } = await supabase.from('tasks').update(updates).eq('id', id).select().single();
+        if (error)
+            throw error;
+        return data;
+    }
+};
+export const noteService = {
+    getNotes: async (phone) => {
+        const { data, error } = await supabase.from('notes').select('*').eq('contact_phone', phone).order('created_at', { ascending: false });
+        if (error)
+            throw error;
+        return data;
+    },
+    createNote: async (note) => {
+        const { data, error } = await supabase.from('notes').insert([note]).select().single();
+        if (error)
+            throw error;
+        return data;
+    }
+};
+export const tagService = {
+    getTags: async (phone) => {
+        const { data, error } = await supabase.from('contact_tags').select('tag').eq('contact_phone', phone);
+        if (error)
+            throw error;
+        return data.map(d => d.tag);
+    },
+    addTag: async (phone, tag) => {
+        const { error } = await supabase.from('contact_tags').insert([{ contact_phone: phone, tag }]);
+        if (error)
+            throw error;
+        return true;
+    },
+    removeTag: async (phone, tag) => {
+        const { error } = await supabase.from('contact_tags').delete().eq('contact_phone', phone).eq('tag', tag);
+        if (error)
+            throw error;
+        return true;
     }
 };

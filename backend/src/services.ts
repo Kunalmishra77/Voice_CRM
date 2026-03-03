@@ -296,3 +296,181 @@ export const tagService = {
     return true;
   }
 };
+
+// ============================================================
+// PROXY SERVICE — Provides raw Supabase data to the frontend
+// so the frontend never needs to call Supabase directly
+// (which was causing CORS errors in the browser).
+// ============================================================
+export const proxyService = {
+
+  // ── Lead Insights ──────────────────────────────────────────
+  getInsights: async ({ from, to }: { from?: string; to?: string }) => {
+    let q = supabase.from('lead_insights').select('*').order('created_at', { ascending: false });
+    // Note: If created_at is not available, we could use Timestamp
+    if (from) q = (q as any).gte('created_at', `${from}T00:00:00Z`);
+    if (to)   q = (q as any).lte('created_at', `${to}T23:59:59Z`);
+    const { data, error } = await q;
+    if (error) {
+      console.error('📡 Proxy getInsights error:', error);
+      throw error;
+    }
+    return data || [];
+  },
+
+  getInsightsByIds: async (ids: number[]) => {
+    if (!ids || ids.length === 0) return [];
+    const { data, error } = await supabase.from('lead_insights').select('id, "User Name"').in('id', ids);
+    if (error) throw error;
+    return data || [];
+  },
+
+  getInsightByPhone: async (phone: string) => {
+    const { data, error } = await supabase
+      .from('lead_insights')
+      .select('*')
+      .eq('Phone Number', phone)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  },
+
+  // ── CRM Lead State ─────────────────────────────────────────
+  getStates: async (leadIds?: number[]) => {
+    let q = supabase.from('crm_lead_state').select('*');
+    if (leadIds && leadIds.length > 0) {
+      q = (q as any).in('lead_insights_id', leadIds);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+
+  upsertState: async (payload: any) => {
+    const { error } = await supabase.from('crm_lead_state').upsert(payload, { onConflict: 'phone_number' });
+    if (error) throw error;
+    return { ok: true };
+  },
+
+  updateStateByPhone: async (phone: string, payload: any) => {
+    const { data, error } = await supabase
+      .from('crm_lead_state')
+      .update(payload)
+      .eq('phone_number', phone)
+      .select();
+    if (error) throw error;
+    return data || [];
+  },
+
+  insertState: async (payload: any) => {
+    const { error } = await supabase.from('crm_lead_state').insert(payload);
+    if (error) throw error;
+    return { ok: true };
+  },
+
+  // ── WhatsApp Conversations ─────────────────────────────────
+  getConversationsRange: async ({ from, to }: { from?: string; to?: string }) => {
+    let q = supabase.from('whatsapp_conversations').select('*').order('Timestamp', { ascending: false });
+    if (from) q = (q as any).gte('Timestamp', `${from}T00:00:00Z`);
+    if (to)   q = (q as any).lte('Timestamp', `${to}T23:59:59Z`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+
+  getConversationBySessionId: async (sessionId: string) => {
+    const isPhone = /^\d+$/.test(sessionId);
+    let q = supabase.from('whatsapp_conversations').select('*').order('Timestamp', { ascending: true });
+    if (isPhone) {
+      // Correct quoting for .or() syntax with spaces in column names
+      q = (q as any).or(`"Session ID".eq.${sessionId},"Phone Number".eq.${sessionId}`);
+    } else {
+      q = (q as any).eq('Session ID', sessionId);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+
+  // ── Lead Tasks ─────────────────────────────────────────────
+  getTasks: async () => {
+    let { data, error } = await supabase.from('lead_tasks').select('*').order('due_at', { ascending: true });
+    if (error) {
+      // Fallback to tasks table
+      const fb = await supabase.from('tasks').select('*').order('due_at', { ascending: true });
+      if (fb.error) throw fb.error;
+      data = (fb.data || []).map((t: any) => ({ ...t, phone_number: t.phone_number || t.contact_phone }));
+    }
+    return data || [];
+  },
+
+  createTask: async (task: any) => {
+    const { error } = await supabase.from('lead_tasks').insert({ ...task, created_at: new Date().toISOString() });
+    if (error) {
+      // Fallback
+      const { error: fb } = await supabase.from('tasks').insert({
+        contact_phone: task.phone_number, task_type: task.task_type,
+        due_at: task.due_at, notes: task.notes, created_by: task.created_by,
+        done: false, created_at: new Date().toISOString()
+      });
+      if (fb) throw fb;
+    }
+    return { ok: true };
+  },
+
+  updateTask: async (id: string, payload: any) => {
+    const { error } = await supabase.from('lead_tasks').update(payload).eq('id', id);
+    if (error) {
+      const { error: fb } = await supabase.from('tasks').update(payload).eq('id', id);
+      if (fb) throw fb;
+    }
+    return { ok: true };
+  },
+
+  // ── Lead Comments ──────────────────────────────────────────
+  insertComment: async (payload: any) => {
+    const { error } = await supabase.from('lead_comments').insert(payload);
+    if (error) throw error;
+    return { ok: true };
+  },
+
+  getComments: async ({ from, to, like }: { from?: string; to?: string; like?: string }) => {
+    let q = supabase.from('lead_comments').select('*').order('created_at', { ascending: false });
+    if (like)  q = (q as any).like('comment_text', like);
+    if (from)  q = (q as any).gte('created_at', `${from}T00:00:00Z`);
+    if (to)    q = (q as any).lte('created_at', `${to}T23:59:59Z`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+
+  // ── Optional / Safe Inserts ────────────────────────────────
+  insertOptional: async (table: string, payload: any) => {
+    // Will not throw — silently ignores missing table errors
+    const ALLOWED = ['converted_leads', 'unconverted_leads'];
+    if (!ALLOWED.includes(table)) return { ok: false, reason: 'table not allowed' };
+    try {
+      await supabase.from(table as any).insert(payload);
+    } catch (_) { /* intentional silent */ }
+    return { ok: true };
+  },
+
+  // ── Table / Column Existence Check ────────────────────────
+  checkTable: async (table: string, columns: string) => {
+    try {
+      const { data, error } = await supabase.from(table as any).select(columns).limit(1);
+      // If error exists but it is not a 404/PGRST116 (Not Found), it might be connection
+      if (error && (error as any).code === 'PGRST116') return false; 
+      if (error) {
+        console.error(`📡 Table check failed for ${table}:`, error.message);
+        return true; // Assume exists but connection failed (to avoid misleading frontend)
+      }
+      return true;
+    } catch (e: any) {
+      console.error(`📡 CheckTable catch error for ${table}:`, e.message);
+      return true; // Fail safe to true
+    }
+  }
+};
