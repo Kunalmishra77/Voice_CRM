@@ -10,49 +10,34 @@ interface ChartContainerProps {
 /**
  * ChartContainer
  * ──────────────
- * Provides a stable parent for Recharts.
- * Uses a double-lock strategy (State + Intersection) to ensure
- * the browser has calculated dimensions before mounting the SVG.
+ * Provides a robust, responsive container for Recharts.
+ * Solves the "width/height is 0" issues by ensuring parent has dimensions.
  */
-export const ChartContainer: React.FC<ChartContainerProps> = ({ 
-  children, 
-  height = 300, 
-  className 
+export const ChartContainer: React.FC<ChartContainerProps> = ({
+  children,
+  height = 300,
+  className
 }) => {
   const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const containerHeight = typeof height === 'number' ? `${height}px` : height;
 
+  // Recharts needs a slight delay or an explicit mount signal 
+  // to correctly calculate parent dimensions.
   useEffect(() => {
-    // 1. Initial short delay for DOM structure
-    const timer = setTimeout(() => {
-      // 2. Check if element is actually in DOM and has size
-      if (containerRef.current && containerRef.current.offsetWidth > 0) {
-        setIsReady(true);
-      } else {
-        // 3. Fallback: use a ResizeObserver to wait for layout
-        const observer = new ResizeObserver((entries) => {
-          if (entries[0].contentRect.width > 0) {
-            setIsReady(true);
-            observer.disconnect();
-          }
-        });
-        if (containerRef.current) observer.observe(containerRef.current);
-        return () => observer.disconnect();
-      }
-    }, 100);
-
+    const timer = setTimeout(() => setIsReady(true), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  const containerHeight = typeof height === 'number' ? `${height}px` : height;
 
   return (
     <div 
       ref={containerRef}
-      className={cn("w-full relative overflow-hidden min-w-0 min-h-0", className)} 
+      className={cn("w-full relative overflow-hidden min-w-[1px] min-h-[1px]", className)} 
       style={{ height: containerHeight, minHeight: containerHeight }}
     >
       {isReady && (
-        <div className="absolute inset-0 w-full h-full animate-in fade-in duration-500">
+        <div className="absolute inset-0 w-full h-full animate-in fade-in duration-500 min-w-0 min-h-0">
           {children}
         </div>
       )}

@@ -10,6 +10,7 @@ export interface KPIStats {
   unconverted: number;
   pendingDecisions: number;
   avgScore: number;
+  bucketCounts?: Record<string, number>;
 }
 
 export interface ScoringResult {
@@ -138,7 +139,7 @@ export interface FetchLeadsParams {
   status?: string;
   search?: string;
   sentiment?: string;
-  missing?: string;
+  limit?: number;
   worked?: 'yes' | 'no' | 'all';
 }
 

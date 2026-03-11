@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -16,7 +16,9 @@ import {
   Info,
   Calendar,
   Phone,
-  UserCheck
+  UserCheck,
+  X,
+  CheckCircle
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -30,15 +32,19 @@ import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
 import { Skeleton } from '../../ui/Skeleton';
 import { cn } from '../../lib/utils';
+import { LeadWorkflowModals } from '../../components/Lead/LeadWorkflowModals';
+import { type LeadInsightRow } from '../../data/api';
 
 const LeadDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Find lead by ID (id is lead_id in our mock)
-  // Our provider has getLeads, but not getLeadById. 
-  // Let's use getLeads with search for now or add getLeadById if needed.
-  // Actually, id in URL might be leadId or phone.
+  const [workflowModal, setWorkflowModal] = useState<{ isOpen: boolean; lead: LeadInsightRow | null; type: 'Converted' | 'NotInterested' | 'Closed' | null }>({
+    isOpen: false,
+    lead: null,
+    type: null
+  });
+
   const { data: lead, isLoading } = useQuery({
     queryKey: ['lead-detail', id],
     queryFn: async () => {
@@ -101,13 +107,27 @@ const LeadDetailPage: React.FC = () => {
           <p className="text-zinc-500 font-medium mt-1">Deep-dive intelligence for entity node: {lead['Phone Number']}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="primary" size="sm" onClick={() => navigate(`/calls?sessionId=${lead.id}`)} className="rounded-2xl px-6 h-11 shadow-xl shadow-teal-500/20">
-            <PhoneCall size={14} className="mr-2" /> View Call Transcript
+          <Button variant="outline" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'NotInterested' })} className="rounded-2xl px-6 h-11 border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
+            <X size={14} className="mr-2" /> Mark as Lost
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'Converted' })} className="rounded-2xl px-6 h-11 shadow-xl shadow-teal-500/20 bg-emerald-500 border-emerald-500 hover:bg-emerald-600">
+            <CheckCircle size={14} className="mr-2" /> Mark as Converted
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => navigate(`/calls?sessionId=${lead.id}`)} className="rounded-2xl px-6 h-11">
+            <PhoneCall size={14} className="mr-2" /> View Transcript
           </Button>
         </div>
       </div>
+
+      {/* Add Modal Component */}
+      <LeadWorkflowModals
+        isOpen={workflowModal.isOpen}
+        onClose={() => setWorkflowModal({ isOpen: false, lead: null, type: null })}
+        lead={workflowModal.lead}
+        type={workflowModal.type}
+      />
       
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
         {/* Profile Card */}
         <div className="lg:col-span-4 space-y-8">
           <SectionCard title="Identity Profile" subtitle="Base entity information and metadata.">
@@ -116,7 +136,7 @@ const LeadDetailPage: React.FC = () => {
                 <User size={56} />
               </div>
               <h4 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 italic uppercase tracking-tight">{lead['User Name']}</h4>
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] mt-3">Node ID: {lead.id.split('_')[1]}</p>
+              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] mt-3">Node ID: {lead.id}</p>
               
               <div className="flex gap-2 mt-6">
                  <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'success'} size="sm" className="px-4 py-1 uppercase font-black">
@@ -207,11 +227,11 @@ const LeadDetailPage: React.FC = () => {
                     </h3>
                     <div className="space-y-2">
                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase">{lead.sentiment} Vector</span>
+                          <span className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase">{(lead.sentiment || 'Neutral')} Vector</span>
                           <span className="text-xs font-black">88%</span>
                        </div>
                        <div className="h-2 w-full bg-zinc-100 dark:bg-white/5 rounded-full overflow-hidden">
-                          <div className={cn("h-full rounded-full shadow-sm", lead.sentiment === 'Positive' ? "bg-emerald-500" : lead.sentiment === 'Negative' ? "bg-rose-500" : "bg-teal-500")} style={{ width: '88%' }} />
+                          <div className={cn("h-full rounded-full shadow-sm", lead.sentiment === 'Positive' || lead.sentiment === 'Hot' ? "bg-emerald-500" : lead.sentiment === 'Negative' ? "bg-rose-500" : "bg-teal-500")} style={{ width: '88%' }} />
                        </div>
                     </div>
                  </div>
@@ -221,8 +241,8 @@ const LeadDetailPage: React.FC = () => {
            <SectionCard title="Agent Interaction Scripts" subtitle="Optimized follow-up templates for this node." icon={<MessageSquare size={18} className="text-blue-500" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                  {[
-                   { t: 'The Empathy Handshake', s: `I understand that ${lead.concern.toLowerCase()} is your main focus. We've optimized our engine to solve exactly that...` },
-                   { t: 'The Performance Pivot', s: `Our latest benchmarks for users facing ${lead.concern.toLowerCase()} show a 40% improvement in deployment speed...` },
+                   { t: 'The Empathy Handshake', s: `I understand that ${(lead.concern || 'your requirements').toLowerCase()} is your main focus. We've optimized our engine to solve exactly that...` },
+                   { t: 'The Performance Pivot', s: `Our latest benchmarks for users facing ${(lead.concern || 'efficiency challenges').toLowerCase()} show a 40% improvement in deployment speed...` },
                  ].map((script, i) => (
                    <Card key={i} className="p-6 bg-zinc-50 dark:bg-white/[0.02] border-zinc-200/50 dark:border-white/5 group hover:border-teal-500/30 transition-all">
                       <div className="flex justify-between items-start mb-4">

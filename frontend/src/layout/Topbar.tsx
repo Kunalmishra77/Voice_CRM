@@ -56,13 +56,13 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
   };
 
   const datePresets: { value: DatePreset; label: string }[] = [
-    { value: 'daily', label: 'Daily' },
-    { value: 'weekly', label: 'Weekly' },
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'halfYearly', label: 'Half-Yearly' },
-    { value: 'yearly', label: 'Yearly' },
-    { value: 'custom', label: 'Custom Range' },
+    { value: 'daily', label: 'Today' },
+    { value: 'weekly', label: 'Last 7 Days' },
+    { value: 'monthly', label: 'This Month' },
+    { value: 'quarterly', label: 'This Quarter' },
+    { value: 'halfYearly', label: 'Last 6 Months' },
+    { value: 'yearly', label: 'This Year' },
+    { value: 'custom', label: 'Custom Range...' },
   ];
 
   const handlePresetChange = (preset: DatePreset) => {
@@ -75,98 +75,94 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
   };
 
   return (
-    <header className="h-20 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[40] bg-white/80 dark:bg-black/80 backdrop-blur-3xl border-b border-black/5 dark:border-white/10">
+    <header className="h-16 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[40] bg-background border-b border-border">
       {/* Mobile Menu Trigger */}
       <Button 
         variant="ghost" 
         size="icon" 
         onClick={onMenuClick} 
-        className="lg:hidden mr-2 text-zinc-500"
+        className="lg:hidden mr-2 text-muted-foreground"
       >
         <Menu size={20} />
       </Button>
 
       {/* Search Bar */}
       <div className="flex-1 max-w-xl hidden md:block">
-        <form onSubmit={handleSearch} className="relative group">
-          <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-teal-500 transition-colors" />
+        <form onSubmit={handleSearch} className="relative group flex items-center">
+          <SearchIcon size={15} className="absolute left-3 text-muted-foreground group-focus-within:text-foreground transition-colors" />
           <input 
             type="text" 
-            placeholder="Search calls, leads or phone..."
+            placeholder="Search queries, nodes, identities..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
-            className="w-full bg-black/5 dark:bg-white/5 border-none rounded-2xl py-2.5 pl-12 pr-6 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all placeholder:text-zinc-400"
+            className="w-full bg-accent/50 border border-border rounded-lg py-2 pl-9 pr-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-ring focus:bg-background transition-all placeholder:text-muted-foreground shadow-sm"
           />
         </form>
       </div>
 
-      {/* Global Filters */}
-      <div className="flex items-center gap-2 md:gap-3 md:px-6">
+      {/* Right actions */}
+      <div className="flex items-center gap-2 md:gap-4 ml-auto">
         <CustomDropdownMenu
-          align="left"
+          align="right"
           trigger={
-            <Button variant="secondary" size="sm" className="rounded-2xl flex items-center gap-2 px-3 md:px-4 bg-zinc-100 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-teal-500/30 transition-all">
-              <Calendar size={14} className="text-teal-500" />
-              <span className="text-[11px] md:text-[12px] font-bold text-zinc-700 dark:text-zinc-300">
+            <Button variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-3 h-9 bg-card hover:bg-accent border-border shadow-sm transition-all text-muted-foreground hover:text-foreground">
+              <Calendar size={14} />
+              <span className="text-sm font-medium">
                 {formatRangeLabel(datePreset, dateRange.from, dateRange.to)}
               </span>
-              <ChevronDown size={14} className="text-zinc-400 hidden sm:block" />
             </Button>
           }
         >
           <div className="p-1 min-w-[180px]">
-            <div className="px-3 py-2 text-[10px] font-black uppercase text-zinc-400 tracking-widest">Select Range</div>
+            <div className="px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Timeframe</div>
             {datePresets.map((preset) => (
               <DropdownMenuItem 
                 key={preset.value} 
                 onClick={() => handlePresetChange(preset.value)}
-                className={datePreset === preset.value ? "text-teal-500 bg-teal-500/5" : ""}
+                className={datePreset === preset.value ? "bg-accent text-foreground" : "text-muted-foreground"}
               >
                 {preset.label}
               </DropdownMenuItem>
             ))}
           </div>
         </CustomDropdownMenu>
-      </div>
 
-      {/* Right actions */}
-      <div className="flex items-center gap-2 md:gap-4">
         <div className="hidden sm:flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground hover:text-foreground h-9 w-9 rounded-lg">
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </Button>
 
-          <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900 relative">
-            <Bell size={18} />
-            <div className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-black shadow-sm" />
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative h-9 w-9 rounded-lg">
+            <Bell size={16} />
+            <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-blue-500 rounded-full border border-background" />
           </Button>
         </div>
         
-        <div className="hidden sm:block w-px h-6 bg-black/5 dark:bg-white/10 mx-1 md:mx-2" />
+        <div className="hidden sm:block w-px h-5 bg-border mx-1" />
 
         {/* Profile Section */}
         <CustomDropdownMenu
+          align="right"
           trigger={
-            <div className="flex items-center gap-2 md:gap-3 p-1 rounded-2xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
-               <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-400 flex items-center justify-center text-white text-[10px] md:text-xs font-bold shadow-sm group-hover:scale-105 transition-transform duration-300">
+            <div className="flex items-center gap-2 p-1 rounded-lg cursor-pointer hover:bg-accent transition-colors group">
+               <div className="w-7 h-7 rounded-md bg-foreground flex items-center justify-center text-background text-xs font-bold shadow-sm">
                   VA
                </div>
-               <div className="hidden lg:flex flex-col items-start pr-2">
-                  <span className="text-[13px] font-bold text-zinc-900 dark:text-zinc-100 leading-none">Super Admin</span>
-                  <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-1">Command Center</span>
+               <div className="hidden lg:flex flex-col items-start pr-1">
+                  <span className="text-sm font-semibold text-foreground leading-none">Admin</span>
                </div>
-               <ChevronDown size={12} className="text-zinc-400 mr-1" />
+               <ChevronDown size={14} className="text-muted-foreground" />
             </div>
           }
         >
           <DropdownMenuItem onClick={() => navigate('/settings')} icon={<UserIcon size={14} />}>
-            My Profile
+            Profile
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate('/settings')} icon={<Settings size={14} />}>
-            System Settings
+            Settings
           </DropdownMenuItem>
-          <div className="h-px bg-black/5 dark:bg-white/10 my-1" />
-          <DropdownMenuItem onClick={() => toast.error("Sign out simulated.")} icon={<LogOut size={14} />} className="text-red-500">
+          <div className="h-px bg-border my-1" />
+          <DropdownMenuItem onClick={() => toast.error("Sign out disabled in demo.")} icon={<LogOut size={14} />} className="text-red-500 hover:text-red-600 hover:bg-red-500/10">
             Sign Out
           </DropdownMenuItem>
         </CustomDropdownMenu>

@@ -13,12 +13,6 @@ interface SectionCardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
-/**
- * SectionCard
- * ───────────
- * A high-level layout component for dashboard sections.
- * Optimized for flexible height alignment.
- */
 export const SectionCard: React.FC<SectionCardProps> = ({ 
   title, 
   subtitle, 
@@ -31,32 +25,32 @@ export const SectionCard: React.FC<SectionCardProps> = ({
 }) => {
   const paddingStyles = {
     none: "p-0",
-    sm: "p-4 md:p-5",
-    md: "p-6 md:p-7",
-    lg: "p-8 md:p-10",
+    sm: "p-4",
+    md: "p-5 md:p-6",
+    lg: "p-8",
   };
 
   return (
     <Card 
       overflowHidden={overflowHidden} 
       className={cn(
-        "flex flex-col",
+        "flex flex-col bg-card rounded-xl border border-border",
         paddingStyles[padding], 
         className
       )}
     >
       {(title || subtitle || headerActions || icon) && (
-        <div className="flex items-center justify-between mb-6 shrink-0">
-          <div className="flex items-start gap-3 md:gap-4">
-            {icon && <div className="mt-1 flex-shrink-0">{icon}</div>}
+        <div className="flex items-center justify-between mb-5 shrink-0 border-b border-border/50 pb-4">
+          <div className="flex items-center gap-3">
+            {icon && <div className="flex-shrink-0 text-muted-foreground">{icon}</div>}
             <div className="min-w-0">
               {title && (
-                <h3 className="text-sm md:text-base font-black text-zinc-900 dark:text-zinc-100 tracking-tight uppercase italic truncate">
+                <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">
                   {title}
                 </h3>
               )}
               {subtitle && (
-                <p className="text-[10px] md:text-xs font-medium text-zinc-500 mt-0.5 truncate">
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {subtitle}
                 </p>
               )}

@@ -1,16 +1,8 @@
 import { MockProvider } from './providers/MockProvider';
+import { BackendProvider } from './providers/BackendProvider';
 import type { IDataProvider } from './IDataProvider';
 
-// Read from env, fallback to 'mock'
-const providerType = import.meta.env.VITE_DATA_PROVIDER || 'mock';
-
-let activeProvider: IDataProvider;
-
-if (providerType === 'mock') {
-  activeProvider = new MockProvider();
-} else {
-  // Future: activeProvider = new SupabaseProvider();
-  activeProvider = new MockProvider();
-}
+// FORCED TO BACKEND - DISABLED MOCK DATA
+let activeProvider: IDataProvider = new BackendProvider();
 
 export const dataProvider = activeProvider;

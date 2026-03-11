@@ -12,7 +12,7 @@ export const Card: React.FC<CardProps> = ({
   children, 
   className, 
   variant = 'panel', 
-  innerGlow = true,
+  innerGlow = false,
   overflowHidden = true,
   onClick,
   ...props 
@@ -21,13 +21,13 @@ export const Card: React.FC<CardProps> = ({
     <div 
       onClick={onClick}
       className={cn(
-        "rounded-3xl border border-black/5 dark:border-white/10 transition-all duration-300",
+        "rounded-xl border transition-all duration-200",
         overflowHidden && "overflow-hidden",
-        variant === 'glass' && "bg-white/70 dark:bg-[#1c1c1e]/70 backdrop-blur-2xl shadow-sm",
-        variant === 'panel' && "bg-white dark:bg-[#1c1c1e] shadow-sm",
-        variant === 'raised' && "bg-white dark:bg-[#2c2c2e] shadow-premium",
-        innerGlow && "shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
-        onClick && "cursor-pointer active:scale-[0.98]",
+        variant === 'glass' && "bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border-border",
+        variant === 'panel' && "bg-card border-border shadow-sm",
+        variant === 'raised' && "bg-card border-border shadow-premium",
+        innerGlow && "shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
+        onClick && "cursor-pointer active:scale-[0.99] hover:border-zinc-300 dark:hover:border-zinc-700",
         className
       )}
       {...props}
