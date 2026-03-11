@@ -6,7 +6,7 @@
  * the browser never calls Supabase REST directly (which was blocked by CORS).
  */
 
-const BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3010/api';
+const BASE = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://localhost:3010/api';
 
 function buildUrl(path: string, params?: Record<string, any>): string {
     const url = new URL(`${BASE}${path}`);

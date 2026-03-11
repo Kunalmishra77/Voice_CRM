@@ -35,6 +35,10 @@ app.use('/api', authGuard, routes);
 
 // Port Auto-Increment Logic
 function startServer(port: number) {
+  if (process.env.VERCEL) {
+    console.log('Running on Vercel, skipping app.listen');
+    return;
+  }
   const server = app.listen(port, () => {
     console.log(`
 🚀 Backend is running!
@@ -54,3 +58,5 @@ function startServer(port: number) {
 }
 
 startServer(INITIAL_PORT);
+
+export default app;
