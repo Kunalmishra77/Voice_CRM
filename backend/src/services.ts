@@ -154,7 +154,7 @@ export const dashboardService = {
       Average: sentiment_counts['null'] || 0,
       Converted: status_counts[CRM_CONVERTED] || 0,
       Lost: status_counts[CRM_LOST] || 0,
-      Pending: count - (status_counts[CRM_CONVERTED] || 0) - (status_counts[CRM_LOST] || 0)
+      Pending: (count || 0) - (status_counts[CRM_CONVERTED] || 0) - (status_counts[CRM_LOST] || 0)
     };
     return {
       total_leads: count || 0,
