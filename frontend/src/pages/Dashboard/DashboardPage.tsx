@@ -126,7 +126,7 @@ const DashboardPage: React.FC = () => {
     return !kpis || kpis.totalLeads === 0;
   }, [kpis, kpisLoading]);
 
-  const ROW_HEIGHT = "h-[300px]";
+  const ROW_HEIGHT = "h-[280px]";
 
   return (
     <PageShell>
@@ -201,10 +201,10 @@ const DashboardPage: React.FC = () => {
 
             {/* Right Col (Pie) */}
             <div className="xl:col-span-1">
-               <SectionCard title="Distribution" icon={<PieIcon size={16} />} className="h-[280px]">
-                 <div className="flex flex-row items-center h-full gap-4">
-                    {/* Left: Legend */}
-                    <div className="flex-1 space-y-0.5">
+               <SectionCard title="Distribution" icon={<PieIcon size={16} />} className="h-[584px]">
+                 <div className="flex flex-col items-center justify-center h-full gap-8 py-10">
+                    {/* Top: Legend Grid */}
+                    <div className="w-full grid grid-cols-2 gap-3 px-4">
                         {[
                           { name: 'Hot', color: '#ef4444' },
                           { name: 'Warm', color: '#f59e0b' },
@@ -213,30 +213,31 @@ const DashboardPage: React.FC = () => {
                         ].map((item) => {
                             const val = stageDistro?.find(s => s.name === (item.name === 'Average' ? 'null' : item.name))?.value || 0;
                             return (
-                                <div key={item.name} onClick={() => handleStatClick(item.name)} className="flex items-center justify-between p-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group">
+                                <div key={item.name} onClick={() => handleStatClick(item.name)} className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200/50 dark:border-white/5 hover:border-teal-500/20 cursor-pointer transition-all group">
                                   <div className="flex items-center gap-2">
-                                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">{item.name}</span>
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                                      <span className="text-[11px] font-black text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors uppercase tracking-widest">{item.name}</span>
                                   </div>
-                                  <span className="text-[11px] font-semibold text-foreground">{val}%</span>
+                                  <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 tabular-nums">{val}%</span>
                                 </div>
                             );
                         })}
-                        <div onClick={() => handleStatClick('all')} className="flex items-center justify-between p-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group mt-1 pt-2 border-t border-border/50">
-                          <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground uppercase tracking-tight">Registry</span>
-                          <ArrowRight size={10} className="text-muted-foreground group-hover:text-foreground" />
-                        </div>
                     </div>
 
-                    {/* Right: Pie Chart */}
-                    <div className="flex-shrink-0">
+                    <div onClick={() => handleStatClick('all')} className="w-full max-w-[200px] flex items-center justify-between p-3 px-5 rounded-2xl bg-teal-500/5 border border-teal-500/10 hover:bg-teal-500/10 cursor-pointer transition-all group mx-4">
+                        <span className="text-[11px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-[0.2em]">Registry</span>
+                        <ArrowRight size={14} className="text-teal-500 group-hover:translate-x-1 transition-transform" />
+                    </div>
+
+                    {/* Bottom: Pie Chart (Larger) */}
+                    <div className="flex-1 flex items-center justify-center w-full">
                       {isMounted && stageDistro && stageDistro.length > 0 ? (
-                        <div className="relative flex items-center justify-center cursor-pointer" onClick={() => handleStatClick('all')}>
-                          <PieChart width={140} height={140}>
+                        <div className="relative flex items-center justify-center cursor-pointer scale-125" onClick={() => handleStatClick('all')}>
+                          <PieChart width={200} height={200}>
                               <Pie 
                                 data={stageDistro} 
-                                innerRadius={45} 
-                                outerRadius={65} 
+                                innerRadius={65} 
+                                outerRadius={90} 
                                 paddingAngle={4} 
                                 dataKey="value" 
                                 stroke="none"
@@ -247,11 +248,12 @@ const DashboardPage: React.FC = () => {
                               </Pie>
                           </PieChart>
                           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-lg font-bold text-foreground leading-none">{kpis?.totalLeads ?? 0}</span>
+                            <span className="text-3xl font-black text-foreground tracking-tighter italic tabular-nums">{kpis?.totalLeads ?? 0}</span>
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1 opacity-50">Total</span>
                           </div>
                         </div>
                       ) : (
-                        <div className="w-[140px] h-[140px] flex items-center justify-center"><Loader2 className="w-5 h-5 text-muted-foreground animate-spin" /></div>
+                        <div className="w-[200px] h-[200px] flex items-center justify-center"><Loader2 className="w-8 h-8 text-teal-500 animate-spin" /></div>
                       )}
                     </div>
                  </div>

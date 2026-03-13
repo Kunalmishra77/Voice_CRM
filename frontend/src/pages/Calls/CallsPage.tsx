@@ -358,22 +358,50 @@ const CallsPage: React.FC = () => {
               {/* Action Buttons */}
               <div className="space-y-4 pt-8 border-t border-border">
                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-[0.2em]">Node Disposition</h3>
-                 <div className="grid grid-cols-1 gap-2.5">
-                    <Button 
-                      variant="primary"
-                      onClick={() => handleOpenOutcomeModal('Converted')}
-                      className="rounded-lg h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest border-none shadow-sm shadow-emerald-500/10"
-                    >
-                       Mark Converted
-                    </Button>
-                    <Button 
-                      variant="secondary"
-                      onClick={() => handleOpenOutcomeModal('Unconverted')}
-                      className="rounded-lg h-10 font-bold text-xs uppercase tracking-widest bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
-                    >
-                       Mark Unconverted
-                    </Button>
-                 </div>
+                 {(() => {
+                    const localOutcome = outcomes[selectedCall.sessionId];
+                    const currentStatus = localOutcome?.outcome || leadInsight.status;
+                    
+                    if (currentStatus === 'Converted' || currentStatus === 'Unconverted' || currentStatus === 'NotInterested' || currentStatus === 'Closed') {
+                       return (
+                          <div className="p-4 rounded-xl bg-accent border border-border flex flex-col items-center justify-center gap-2 animate-in fade-in zoom-in duration-300">
+                             <div className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center mb-1",
+                                currentStatus === 'Converted' ? "bg-emerald-500/20 text-emerald-600" : "bg-rose-500/20 text-rose-600"
+                             )}>
+                                {currentStatus === 'Converted' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                             </div>
+                             <p className="text-xs font-bold uppercase tracking-widest text-foreground">
+                                Finalized as {currentStatus}
+                             </p>
+                             {localOutcome?.reason && (
+                                <p className="text-[10px] font-medium text-muted-foreground italic text-center">
+                                   Reason: {localOutcome.reason}
+                                </p>
+                             )}
+                          </div>
+                       );
+                    }
+
+                    return (
+                       <div className="grid grid-cols-1 gap-2.5">
+                          <Button 
+                            variant="primary"
+                            onClick={() => handleOpenOutcomeModal('Converted')}
+                            className="rounded-lg h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest border-none shadow-sm shadow-emerald-500/10"
+                          >
+                             Mark Converted
+                          </Button>
+                          <Button 
+                            variant="secondary"
+                            onClick={() => handleOpenOutcomeModal('Unconverted')}
+                            className="rounded-lg h-10 font-bold text-xs uppercase tracking-widest bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                          >
+                             Mark Unconverted
+                          </Button>
+                       </div>
+                    );
+                 })()}
               </div>
 
             </div>
