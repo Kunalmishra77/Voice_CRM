@@ -153,7 +153,13 @@ const LeadDetailPage: React.FC = () => {
                  { label: 'Primary Frequency', value: lead['Phone Number'], icon: Phone },
                  { label: 'Assigned Operator', value: lead.owner || 'Unassigned', icon: UserCheck },
                  { label: 'Current Status', value: lead.status || lead['lead stage'], icon: Activity },
-                 { label: 'Last Intercept', value: format(parseISO(lead.created_at), 'MMM dd, yyyy HH:mm'), icon: Calendar },
+                 { label: 'Last Intercept', value: (() => {
+                    try {
+                      if (!lead.created_at) return 'N/A';
+                      const date = parseISO(lead.created_at);
+                      return isNaN(date.getTime()) ? 'N/A' : format(date, 'MMM dd, yyyy HH:mm');
+                    } catch (e) { return 'N/A'; }
+                 })(), icon: Calendar },
                ].map((item, i) => (
                  <div key={i} className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-400">
@@ -177,7 +183,15 @@ const LeadDetailPage: React.FC = () => {
                     <div key={i} className="p-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-transparent hover:border-teal-500/20 transition-all cursor-pointer group" onClick={() => navigate(`/calls?sessionId=${call.sessionId}`)}>
                        <div className="flex justify-between items-center mb-2">
                           <span className="text-[10px] font-black text-zinc-900 dark:text-white uppercase">{call.status === 'Done' ? 'VOICE_COMPLETED' : 'VOICE_ACTIVE'}</span>
-                          <span className="text-[9px] font-bold text-zinc-400">{format(parseISO(call.lastTimestamp), 'MMM dd')}</span>
+                          <span className="text-[9px] font-bold text-zinc-400">
+                            {(() => {
+                               try {
+                                  if (!call.lastTimestamp) return 'N/A';
+                                  const date = parseISO(call.lastTimestamp);
+                                  return isNaN(date.getTime()) ? 'N/A' : format(date, 'MMM dd');
+                               } catch (e) { return 'N/A'; }
+                            })()}
+                          </span>
                        </div>
                        <p className="text-[11px] font-medium text-zinc-500 line-clamp-1 italic">"{call.lastMessage}"</p>
                     </div>

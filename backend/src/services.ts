@@ -1,6 +1,6 @@
 import { supabase } from './lib/supabase.js';
 
-const LEADS_TABLE = 'leads';
+const LEADS_TABLE = 'call_leads';
 const COLS = {
   leads: {
     id: 'leadid',
@@ -169,7 +169,7 @@ export const taskService = { getTasks: async () => [] };
 export const noteService = { getNotes: async () => [] };
 export const tagService = { getTags: async () => [] };
 export const proxyService = { 
-  checkTable: async (table: string) => table === 'leads',
+  checkTable: async (table: string) => table === 'call_leads',
   getInsightByPhone: async (phone: string) => {
     const { data, error } = await supabase.from(LEADS_TABLE).select('*').eq(COLS.leads.phone, phone).order(COLS.leads.created_at, { ascending: false }).limit(1).maybeSingle();
     if (error) throw error;

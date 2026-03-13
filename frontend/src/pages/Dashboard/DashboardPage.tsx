@@ -280,7 +280,17 @@ const DashboardPage: React.FC = () => {
                               </Badge>
                            </td>
                            <td className="px-4 py-3.5 text-center text-sm font-medium text-foreground">{lead.duration}s</td>
-                           <td className="px-4 py-3.5 text-right text-sm text-muted-foreground">{format(parseISO(lead.created_at), 'MMM dd, HH:mm')}</td>
+                           <td className="px-4 py-3.5 text-right text-sm text-muted-foreground">
+                              {(() => {
+                                 try {
+                                    if (!lead.created_at) return 'N/A';
+                                    const date = parseISO(lead.created_at);
+                                    return isNaN(date.getTime()) ? 'N/A' : format(date, 'MMM dd, HH:mm');
+                                 } catch (e) {
+                                    return 'N/A';
+                                 }
+                              })()}
+                           </td>
                         </tr>
                       ))}
                    </tbody>
