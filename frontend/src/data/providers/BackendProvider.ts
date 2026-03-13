@@ -1,7 +1,8 @@
 import type { DateRange, DatePreset } from '../../utils/dateRange';
 import { bGet, bPost, bPatch } from '../backendApi';
 import type { IDataProvider } from '../IDataProvider';
-import { format, parseISO, eachDayOfInterval, isSameDay } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
+import { safeFormat, safeParseISO } from '../../lib/utils';
 import type { 
   KPIStats, 
   LeadInsightRow, 
@@ -60,17 +61,17 @@ export class BackendProvider implements IDataProvider {
 
   async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string): Promise<TrendPoint[]> {
     const leads = await this.getLeads({ range, bucket });
-    const interval = eachDayOfInterval({ start: parseISO(range.from), end: parseISO(range.to) });
+    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
     return interval.map(day => {
-      const dayLeads = leads.filter(l => isSameDay(parseISO(l.created_at), day));
+      const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
       return {
-        name: format(day, 'MMM dd'),
+        name: safeFormat(day, 'MMM dd'),
         hot: dayLeads.filter(l => l.sentiment === 'Hot').length,
         warm: dayLeads.filter(l => l.sentiment === 'Warm').length,
         cold: dayLeads.filter(l => l.sentiment === 'Cold').length,
         converted: dayLeads.filter(l => (l.status as any) === 'crm_converted').length,
-        from: format(day, 'yyyy-MM-dd'),
-        to: format(day, 'yyyy-MM-dd')
+        from: safeFormat(day, 'yyyy-MM-dd'),
+        to: safeFormat(day, 'yyyy-MM-dd')
       };
     });
   }
@@ -95,7 +96,7 @@ export class BackendProvider implements IDataProvider {
         id: l.leadid.toString(),
         name: l['User Name'],
         phone: l['Phone Number'],
-        time: format(parseISO(l.Timestamp), 'hh:mm a'),
+        time: safeFormat(l.Timestamp, 'hh:mm a'),
         status: l.sentiment || 'New',
         score: l.sentiment === 'Hot' ? 95 : 70,
         scoring: { score: 90, bucket: l.sentiment || 'Average', reasons: [] },
@@ -146,16 +147,16 @@ export class BackendProvider implements IDataProvider {
 
   async getVoiceTrend(range: DateRange, _preset: DatePreset): Promise<VoiceTrendPoint[]> {
     const leads = await this.getLeads({ range });
-    const interval = eachDayOfInterval({ start: parseISO(range.from), end: parseISO(range.to) });
+    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
     return interval.map(day => {
-        const dayLeads = leads.filter(l => isSameDay(parseISO(l.created_at), day));
+        const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
         return {
-          name: format(day, 'MMM dd'),
+          name: safeFormat(day, 'MMM dd'),
           messages: dayLeads.length,
           sessions: dayLeads.length,
           contacts: new Set(dayLeads.map(l => l['Phone Number'])).size,
-          from: format(day, 'yyyy-MM-dd'),
-          to: format(day, 'yyyy-MM-dd')
+          from: safeFormat(day, 'yyyy-MM-dd'),
+          to: safeFormat(day, 'yyyy-MM-dd')
         };
     });
   }
@@ -208,11 +209,11 @@ export class BackendProvider implements IDataProvider {
         }
     });
     const topConcerns = Object.entries(concernMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
-    const interval = eachDayOfInterval({ start: parseISO(range.from), end: parseISO(range.to) });
+    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
     const sentimentTrend = interval.map(day => {
-        const dayLeads = leads.filter(l => isSameDay(parseISO(l.created_at), day));
+        const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
         return {
-            name: format(day, 'MMM dd'),
+            name: safeFormat(day, 'MMM dd'),
             pos: dayLeads.filter(l => l.sentiment === 'Hot').length,
             neu: dayLeads.filter(l => l.sentiment === 'Warm').length,
             neg: dayLeads.filter(l => l.sentiment === 'Cold').length

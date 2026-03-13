@@ -21,7 +21,7 @@ import { Modal } from '../../ui/Modal';
 import { useGlobalFilters } from '../../state/globalFiltersStore';
 import { dataProvider } from '../../data/dataProvider';
 import { type ChatMessage, type ChatSession } from '../../data/api';
-import { cn } from '../../lib/utils';
+import { cn, safeFormat } from '../../lib/utils';
 import { PageShell } from '../../ui/PageShell';
 
 interface LiveSession extends ChatSession {
@@ -163,7 +163,7 @@ const LiveCallsPage: React.FC = () => {
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex flex-col", !!msg.bot_msg ? "items-start" : "items-end")}>
                           <div className={cn("flex items-center gap-2 mb-2 px-1", !msg.bot_msg && "flex-row-reverse")}>
                              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest opacity-60">{!!msg.bot_msg ? 'Bot Node' : 'Client'}</span>
-                             <span className="text-[9px] font-bold text-zinc-300 italic opacity-40">{format(parseISO(msg.timestamp), 'hh:mm:ss a')}</span>
+                             <span className="text-[9px] font-bold text-zinc-300 italic opacity-40">{safeFormat(msg.timestamp, 'hh:mm:ss a')}</span>
                           </div>
                           <div className={cn("max-w-[90%] md:max-w-[85%] p-4 md:p-5 rounded-3xl text-sm font-medium shadow-sm transition-all leading-relaxed", !!msg.bot_msg ? "bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-tl-none border border-black/5 dark:border-white/5" : "bg-teal-500 text-white rounded-tr-none shadow-teal-500/10 shadow-lg")}>{msg.bot_msg || msg.user_msg}</div>
                         </motion.div>

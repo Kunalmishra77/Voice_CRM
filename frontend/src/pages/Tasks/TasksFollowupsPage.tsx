@@ -41,7 +41,7 @@ import { FixedDropdown } from '../../ui/FixedDropdown';
 import { useGlobalFilters } from '../../state/globalFiltersStore';
 import { useTasksStore, type LeadTask } from '../../state/tasksStore';
 import { dataProvider } from '../../data/dataProvider';
-import { cn } from '../../lib/utils';
+import { cn, safeFormat, safeParseISO } from '../../lib/utils';
 import { PageShell } from '../../ui/PageShell';
 
 const TASK_TYPES = [
@@ -101,7 +101,7 @@ const TasksFollowupsPage: React.FC = () => {
     const now = new Date();
     return {
       pending: tasks.filter(t => !t.done).length,
-      overdue: tasks.filter(t => !t.done && isBefore(parseISO(t.due_at), now)).length,
+      overdue: tasks.filter(t => !t.done && isBefore(safeParseISO(t.due_at), now)).length,
       completed: tasks.filter(t => t.done).length
     };
   }, [tasks]);
@@ -159,7 +159,7 @@ const TasksFollowupsPage: React.FC = () => {
 
   const openReschedule = (task: LeadTask) => {
     setSelectedTask(task);
-    setForm(prev => ({ ...prev, due_at: format(parseISO(task.due_at), "yyyy-MM-dd'T'HH:mm") }));
+    setForm(prev => ({ ...prev, due_at: safeFormat(task.due_at, "yyyy-MM-dd'T'HH:mm") }));
     setIsRescheduleModalOpen(true);
   };
 
@@ -269,9 +269,9 @@ const TasksFollowupsPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-3">
                         <Badge variant="zinc" className="bg-teal-500/10 text-teal-600 dark:text-teal-400 border-none text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">{task.task_type}</Badge>
-                        <span className={cn("text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5", isBefore(parseISO(task.due_at), new Date()) && !task.done ? "text-rose-500" : "text-zinc-400")}>
-                          <Clock size={12} className={cn(isBefore(parseISO(task.due_at), new Date()) && !task.done ? "text-rose-500" : "text-teal-500")} />
-                          {format(parseISO(task.due_at), 'dd MMM • hh:mm a')}
+                        <span className={cn("text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5", isBefore(safeParseISO(task.due_at), new Date()) && !task.done ? "text-rose-500" : "text-zinc-400")}>
+                          <Clock size={12} className={cn(isBefore(safeParseISO(task.due_at), new Date()) && !task.done ? "text-rose-500" : "text-teal-500")} />
+                          {safeFormat(task.due_at, 'dd MMM • hh:mm a')}
                         </span>
                       </div>
                       <h4 className={cn("text-base font-black mt-2 tracking-tight", task.done ? "line-through text-zinc-500" : "text-zinc-900 dark:text-zinc-100")}>
@@ -325,7 +325,7 @@ const TasksFollowupsPage: React.FC = () => {
 
                   <div className={cn(
                     "absolute left-0 top-0 bottom-0 w-1.5 transition-all",
-                    task.done ? "bg-emerald-500 shadow-[0_0_15px_#10b981]" : isBefore(parseISO(task.due_at), new Date()) ? "bg-rose-500 shadow-[0_0_15px_#f43f5e]" : "bg-teal-500 shadow-[0_0_15px_#14b8a6]"
+                    task.done ? "bg-emerald-500 shadow-[0_0_15px_#10b981]" : isBefore(safeParseISO(task.due_at), new Date()) ? "bg-rose-500 shadow-[0_0_15px_#f43f5e]" : "bg-teal-500 shadow-[0_0_15px_#14b8a6]"
                   )} />
                 </div>
               ))}

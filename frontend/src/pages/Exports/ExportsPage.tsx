@@ -33,7 +33,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { useGlobalFilters } from '../../state/globalFiltersStore';
 import { useExportStore } from '../../state/exportStore';
 import { dataProvider } from '../../data/dataProvider';
-import { cn } from '../../lib/utils';
+import { cn, safeFormat } from '../../lib/utils';
 
 const EXPORT_FORMATS = [
   { value: 'CSV', label: 'CSV (Comman Separated)', icon: TableIcon },
@@ -217,7 +217,7 @@ const ExportsPage: React.FC = () => {
                        <div className="min-w-0">
                           <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase truncate italic tracking-tight">{job.filename}</h4>
                           <div className="flex items-center gap-3 mt-1">
-                             <span className="text-[10px] font-bold text-zinc-400">{format(parseISO(job.timestamp), 'MMM dd, HH:mm')}</span>
+                             <span className="text-[10px] font-bold text-zinc-400">{safeFormat(job.timestamp, 'MMM dd, HH:mm')}</span>
                              <div className="w-1.5 h-1.5 rounded-full bg-zinc-200 dark:bg-white/10" />
                              <span className="text-[10px] font-black text-teal-500 uppercase tracking-widest">{job.count} Nodes</span>
                           </div>

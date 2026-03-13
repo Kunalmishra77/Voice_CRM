@@ -161,32 +161,40 @@ const DashboardPage: React.FC = () => {
             <div className="xl:col-span-2 flex flex-col gap-6">
               <SectionCard title="Acquisition Trend" subtitle="Volume over time" icon={<TrendingUp size={16} />} className={ROW_HEIGHT}>
                 <div className="w-full h-full pb-2">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <BarChart data={trendData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                      <Tooltip cursor={{ fill: 'var(--accent)' }} content={<CustomChartTooltip />} />
-                      <Bar dataKey="hot" fill="#ef4444" radius={[2, 2, 0, 0]} barSize={16} stackId="a" />
-                      <Bar dataKey="warm" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={16} stackId="a" />
-                      <Bar dataKey="cold" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={16} stackId="a" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {isMounted ? (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <BarChart data={trendData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+                        <Tooltip cursor={{ fill: 'var(--accent)' }} content={<CustomChartTooltip />} />
+                        <Bar dataKey="hot" fill="#ef4444" radius={[2, 2, 0, 0]} barSize={16} stackId="a" />
+                        <Bar dataKey="warm" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={16} stackId="a" />
+                        <Bar dataKey="cold" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={16} stackId="a" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center opacity-20"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                  )}
                 </div>
               </SectionCard>
 
               <SectionCard title="Interaction Volume" subtitle="Signal flow" icon={<BarChart4 size={16} />} className={ROW_HEIGHT}>
                 <div className="w-full h-full pb-2">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <AreaChart data={callTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
-                      <defs><linearGradient id="colorC" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                      <Tooltip cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomChartTooltip />} />
-                      <Area type="monotone" dataKey="messages" name="Signals" stroke="#3b82f6" strokeWidth={2} fill="url(#colorC)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {isMounted ? (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <AreaChart data={callTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
+                        <defs><linearGradient id="colorC" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+                        <Tooltip cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomChartTooltip />} />
+                        <Area type="monotone" dataKey="messages" name="Signals" stroke="#3b82f6" strokeWidth={2} fill="url(#colorC)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center opacity-20"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                  )}
                 </div>
               </SectionCard>
             </div>

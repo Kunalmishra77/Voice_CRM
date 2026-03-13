@@ -21,7 +21,7 @@ import { Badge } from '../../ui/Badge';
 import { Modal } from '../../ui/Modal';
 import { FixedDropdown } from '../../ui/FixedDropdown';
 import { EmptyState } from '../../ui/EmptyState';
-import { cn } from '../../lib/utils';
+import { cn, safeFormat } from '../../lib/utils';
 
 const CallsPage: React.FC = () => {
   const location = useLocation();
@@ -135,7 +135,7 @@ const CallsPage: React.FC = () => {
             {isBot ? 'Intelligence Engine' : 'Entity Node'}
           </span>
           <span className="text-[10px] font-medium text-muted-foreground/60">
-            {msg.timestamp ? format(parseISO(msg.timestamp), 'HH:mm:ss') : ''}
+            {safeFormat(msg.timestamp, 'HH:mm:ss', '')}
           </span>
         </div>
         <div className={cn(
@@ -226,7 +226,7 @@ const CallsPage: React.FC = () => {
                              </Badge>
                           )}
                        </div>
-                       <span className="text-[10px] font-medium text-muted-foreground/60">{format(parseISO(call.lastTimestamp), 'HH:mm')}</span>
+                       <span className="text-[10px] font-medium text-muted-foreground/60">{safeFormat(call.lastTimestamp, 'HH:mm')}</span>
                     </div>
                   </div>
                 );
