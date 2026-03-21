@@ -1,7 +1,7 @@
 import type { DateRange, DatePreset } from '../../utils/dateRange';
 import { bGet, bPost, bPatch } from '../backendApi';
 import type { IDataProvider } from '../IDataProvider';
-import { eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parseISO, subDays } from 'date-fns';
 import { safeFormat, safeParseISO } from '../../lib/utils';
 import type { 
   KPIStats, 
@@ -25,8 +25,8 @@ import type {
 } from '../types';
 
 export class BackendProvider implements IDataProvider {
-  async getDashboardKPIs(_range: DateRange): Promise<KPIStats> {
-    const stats = await bGet('/metrics');
+  async getDashboardKPIs(range: DateRange): Promise<KPIStats> {
+    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
     return {
       totalLeads: stats.total_leads,
       hotLeads: stats.bucket_counts?.['Hot'] || 0,
@@ -36,16 +36,18 @@ export class BackendProvider implements IDataProvider {
       converted: stats.bucket_counts?.['Converted'] || 0,
       unconverted: stats.bucket_counts?.['Lost'] || 0,
       pendingDecisions: stats.bucket_counts?.['Pending'] || 0,
-      avgScore: 82,
+      avgScore: stats.total_leads > 0 ? Math.round(((stats.bucket_counts?.['Hot'] || 0) * 90 + (stats.bucket_counts?.['Warm'] || 0) * 60 + (stats.bucket_counts?.['Cold'] || 0) * 30) / stats.total_leads) : 0,
       bucketCounts: stats.bucket_counts
     };
   }
 
   async getLeads(params: FetchLeadsParams): Promise<LeadInsightRow[]> {
-    const res = await bGet('/leads', { 
-        q: params.search, 
+    const res = await bGet('/leads', {
+        q: params.search,
         stage: params.bucket !== 'all' ? params.bucket : params.status,
-        sentiment: params.sentiment === 'all' ? undefined : params.sentiment
+        sentiment: params.sentiment === 'all' ? undefined : params.sentiment,
+        date_from: params.range?.from,
+        date_to: params.range?.to
     });
     return res.data.map((l: any) => ({
         ...l,
@@ -61,7 +63,18 @@ export class BackendProvider implements IDataProvider {
 
   async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string): Promise<TrendPoint[]> {
     const leads = await this.getLeads({ range, bucket });
-    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
+    
+    // Safety check: Cap daily interval to prevent browser hang on large ranges (like All-time)
+    let startDate = safeParseISO(range.from);
+    const endDate = safeParseISO(range.to);
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff > 90) {
+      // If range is too large, only show the last 90 days in the trend chart
+      startDate = subDays(endDate, 89);
+    }
+
+    const interval = eachDayOfInterval({ start: startDate, end: endDate });
     return interval.map(day => {
       const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
       return {
@@ -77,7 +90,7 @@ export class BackendProvider implements IDataProvider {
   }
 
   async getStageDistribution(range: DateRange, bucket?: string): Promise<StagePoint[]> {
-    const stats = await bGet('/metrics');
+    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
     const colors: Record<string, string> = { 'Hot': '#ef4444', 'Warm': '#f59e0b', 'Cold': '#3b82f6', 'null': '#10b981', 'Average': '#10b981' };
     const distData = stats.stage_counts || {};
     const total = Object.values(distData).reduce((a: any, b: any) => a + b, 0) as number || 1;
@@ -105,7 +118,7 @@ export class BackendProvider implements IDataProvider {
   }
 
   async getFunnel(range: DateRange, bucket?: string): Promise<FunnelStep[]> {
-    const stats = await bGet('/metrics');
+    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
     const total = stats.total_leads || 1;
     const bCounts = stats.bucket_counts || {};
     return [
@@ -134,7 +147,7 @@ export class BackendProvider implements IDataProvider {
   }
 
   async getVoicePulse(range: DateRange): Promise<VoicePulse> {
-    const stats = await bGet('/metrics');
+    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
     return {
         incomingChats: stats.total_leads,
         activeSessions: 0,
@@ -147,7 +160,17 @@ export class BackendProvider implements IDataProvider {
 
   async getVoiceTrend(range: DateRange, _preset: DatePreset): Promise<VoiceTrendPoint[]> {
     const leads = await this.getLeads({ range });
-    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
+
+    // Safety check: Cap daily interval
+    let startDate = safeParseISO(range.from);
+    const endDate = safeParseISO(range.to);
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff > 90) {
+      startDate = subDays(endDate, 89);
+    }
+
+    const interval = eachDayOfInterval({ start: startDate, end: endDate });
     return interval.map(day => {
         const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
         return {
@@ -162,7 +185,7 @@ export class BackendProvider implements IDataProvider {
   }
 
   async getSessions(range: DateRange): Promise<ChatSession[]> {
-    const res = await bGet('/conversations');
+    const res = await bGet('/conversations', { date_from: range.from, date_to: range.to });
     return res.data.map((c: any) => ({
         sessionId: c['Session ID'],
         phone: c['Phone Number'],

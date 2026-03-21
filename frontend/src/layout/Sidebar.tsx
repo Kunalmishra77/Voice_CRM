@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  PhoneCall, 
-  Activity, 
+import { motion } from 'framer-motion';
+import {
+  LayoutDashboard,
+  Users,
+  PhoneCall,
+  Activity,
   Settings,
   ChevronLeft,
   ChevronRight,
-  Command
+  ListTodo
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useTheme } from '../state/themeStore';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/calls', label: 'Calls', icon: PhoneCall },
   { path: '/call-insights', label: 'Insights', icon: Activity },
-  { path: '/leads', label: 'Registry', icon: Users },
+  { path: '/leads', label: 'Leads', icon: Users },
+  { path: '/tasks', label: 'Tasks', icon: ListTodo },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -26,52 +29,91 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const { theme } = useTheme();
 
   return (
-    <aside 
+    <aside
       className={cn(
-        "h-screen flex flex-col transition-all duration-300 bg-card border-r border-border sticky top-0 z-[50]",
-        collapsed ? "w-16" : "w-48"
+        "h-screen flex flex-col transition-all duration-500 ease-in-out sticky top-0 z-[50] border-r border-border/40 bg-background/60 backdrop-blur-2xl backdrop-saturate-150",
+        collapsed ? "w-[72px]" : "w-[260px]"
       )}
     >
-      {/* Logo */}
-      <div className="h-16 px-4 flex items-center gap-2 shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-foreground flex items-center justify-center text-background shadow-sm shrink-0">
-          <Command size={14} strokeWidth={2.5} />
-        </div>
+      {/* Premium Logo Area */}
+      <div
+        className={cn(
+          "h-20 flex items-center shrink-0 transition-all duration-300 border-b border-border/30",
+          collapsed ? "px-3 justify-center" : "px-6 gap-4"
+        )}
+      >
+        <motion.div 
+          whileHover={{ rotate: 5, scale: 1.05 }}
+          className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-primary/10 border border-primary/20 p-1.5 shadow-sm"
+        >
+          <img
+            src={theme === 'light' ? "/VMS-Logo.png" : "/VMS-Logo-light.png"}
+            alt="VoiceCRM"
+            className="w-full h-full object-contain"
+          />
+        </motion.div>
         {!collapsed && (
-          <h1 className="text-sm font-semibold tracking-tight text-foreground">
-            VoiceAgent
-          </h1>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[15px] font-bold tracking-tight text-foreground/90">
+              VoiceCRM
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">
+              Intelligence
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 space-y-0.5 py-4 overflow-y-auto custom-scrollbar">
+      {/* Navigation with Enhanced Visuals */}
+      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto custom-scrollbar">
+        {!collapsed && (
+          <div className="px-4 mb-4">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
+              Main Menu
+            </span>
+          </div>
+        )}
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             onClick={onNavigate}
+            end={item.path === '/'}
             className={({ isActive }) => cn(
-              "flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors duration-200 group relative text-[13px] font-medium",
+              "flex items-center gap-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden",
+              collapsed ? "px-0 py-3 justify-center" : "px-4 py-2.5",
               isActive 
-                ? "bg-accent text-accent-foreground" 
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                ? "bg-primary/10 text-primary font-semibold" 
+                : "text-muted-foreground/80 hover:bg-foreground/[0.03] hover:text-foreground"
             )}
           >
             {({ isActive }) => (
               <>
                 <item.icon 
-                  size={16} 
-                  strokeWidth={isActive ? 2.5 : 2}
+                  size={19} 
+                  strokeWidth={isActive ? 2.5 : 2} 
                   className={cn(
-                    "shrink-0 transition-colors",
-                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )}
+                    "shrink-0 transition-all duration-300", 
+                    isActive ? "text-primary" : "text-muted-foreground/60 group-hover:text-foreground"
+                  )} 
                 />
                 {!collapsed && (
-                  <span className="truncate">{item.label}</span>
+                  <span className={cn(
+                    "text-[14px] tracking-tight truncate transition-transform duration-300",
+                    isActive ? "translate-x-0" : "group-hover:translate-x-0.5"
+                  )}>
+                    {item.label}
+                  </span>
+                )}
+                
+                {isActive && (
+                  <motion.div 
+                    layoutId="active-highlight"
+                    className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-r-full"
+                  />
                 )}
               </>
             )}
@@ -79,13 +121,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
         ))}
       </nav>
 
-      {/* Collapse Toggle */}
-      <div className="p-3 border-t border-border hidden lg:block shrink-0 text-center">
-        <button 
+      {/* Edge-to-Edge Video Section */}
+      {!collapsed && (
+        <div className="mt-auto w-full border-t border-border/20 bg-slate-950/20 overflow-hidden">
+          <div className="relative group h-28 flex items-center justify-center">
+            {/* Dark base for blending */}
+            <div className="absolute inset-0 bg-slate-950/40 pointer-events-none" />
+            
+            <video 
+              src="/call-icon.mp4" 
+              autoPlay 
+              loop 
+              muted 
+              playsInline
+              className="relative z-10 w-full h-full object-cover mix-blend-screen opacity-90 transition-opacity group-hover:opacity-100"
+            />
+            
+            {/* Subtle glass overlay */}
+            <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/20 via-transparent to-white/5 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
+      {/* Optimized Collapse Toggle */}
+      <div className="p-4 shrink-0 hidden lg:flex justify-center border-t border-border/20">
+        <button
           onClick={() => setCollapsed(!collapsed)}
-          className="inline-flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+          className={cn(
+            "inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 text-muted-foreground/40 hover:bg-primary/10 hover:text-primary active:scale-95",
+            collapsed ? "justify-center px-0 w-10 h-10" : "w-full justify-start"
+          )}
         >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {collapsed ? <ChevronRight size={18} /> : (
+            <>
+              <ChevronLeft size={18} />
+              <span className="text-xs font-bold uppercase tracking-widest">Collapse</span>
+            </>
+          )}
         </button>
       </div>
     </aside>

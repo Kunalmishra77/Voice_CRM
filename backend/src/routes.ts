@@ -11,7 +11,7 @@ router.get('/health', async (req, res) => {
 // Metrics
 router.get('/metrics', async (req, res) => {
   try {
-    const stats = await dashboardService.getStats();
+    const stats = await dashboardService.getStats(req.query);
     res.json(stats);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

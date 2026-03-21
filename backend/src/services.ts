@@ -23,11 +23,13 @@ const LOST_STATUSES = ['not interested', 'wrong number', 'busy', 'voicemail'];
 
 export const conversationService = {
   getConversations: async (filters: any) => {
-    const { page = 1, limit = 100, q } = filters;
+    const { page = 1, limit = 100, q, date_from, date_to } = filters;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
     if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.summary}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
     if (error) throw error;
     return {
@@ -86,11 +88,13 @@ export const conversationService = {
 
 export const leadService = {
   getLeads: async (filters: any) => {
-    const { page = 1, limit = 100, stage, sentiment, q } = filters;
+    const { page = 1, limit = 100, stage, sentiment, q, date_from, date_to } = filters;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
     if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
     if (stage && stage !== 'all') {
       if (stage === 'Converted') query = query.eq(COLS.leads.status, CRM_CONVERTED);
       else if (stage === 'Lost') query = query.eq(COLS.leads.status, CRM_LOST);
@@ -134,8 +138,12 @@ export const leadService = {
 };
 
 export const dashboardService = {
-  getStats: async () => {
-    const { data, count } = await supabase.from(LEADS_TABLE).select(`"${COLS.leads.status}", "${COLS.leads.sentiment}", "${COLS.leads.phone}"`, { count: 'exact' });
+  getStats: async (filters: any = {}) => {
+    const { date_from, date_to } = filters;
+    let query = supabase.from(LEADS_TABLE).select(`"${COLS.leads.status}", "${COLS.leads.sentiment}", "${COLS.leads.phone}"`, { count: 'exact' });
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    const { data, count } = await query;
     const status_counts: any = { [CRM_CONVERTED]: 0, [CRM_LOST]: 0 };
     const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, null: 0 };
     const phones = new Set();

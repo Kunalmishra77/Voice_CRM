@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Search, Calendar, Phone, Clock, MessageSquare, 
+import {
+  Search, Calendar, Phone, Clock, MessageSquare,
   ChevronRight, Play, Copy, Download, User, Info,
   TrendingUp, CheckCircle2, XCircle, Send, MoreVertical,
   Target, Zap, Flame, FileText, Share2, ArrowLeft,
@@ -37,7 +37,7 @@ const CallsPage: React.FC = () => {
   const [isOutcomeModalOpen, setIsOutcomeModalOpen] = useState(false);
   const [outcomeType, setOutcomeType] = useState<'Converted' | 'Unconverted' | 'Pending'>('Pending');
   const [outcomeForm, setOutcomeForm] = useState({ reason: '', note: '' });
-  
+
   const [view, setView] = useState<'list' | 'detail'>('list');
 
   useEffect(() => {
@@ -76,8 +76,8 @@ const CallsPage: React.FC = () => {
     let list = [...calls];
     const search = (localSearch || globalSearch || '').toLowerCase();
     if (search) {
-      list = list.filter(c => 
-        c.name.toLowerCase().includes(search) || 
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(search) ||
         c.phone.includes(search) ||
         c.lastMessage.toLowerCase().includes(search)
       );
@@ -120,19 +120,19 @@ const CallsPage: React.FC = () => {
       updated_at: new Date().toISOString()
     });
     setIsOutcomeModalOpen(false);
-    toast.success(`Node synchronized as ${outcomeType}`);
+    toast.success(`Saved as ${outcomeType}`);
   };
 
   // --- Sub-components ---
   const MessageBubble = ({ msg }: { msg: any }) => {
     const isBot = !!msg.bot_msg;
     const text = msg.bot_msg || msg.user_msg;
-    
+
     return (
       <div className={cn("flex flex-col mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500", isBot ? "items-start" : "items-end")}>
         <div className={cn("flex items-center gap-3 mb-2 px-1", !isBot && "flex-row-reverse")}>
           <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">
-            {isBot ? 'Intelligence Engine' : 'Entity Node'}
+            {isBot ? 'Assistant' : 'Lead'}
           </span>
           <span className="text-[10px] font-medium text-muted-foreground/60">
             {safeFormat(msg.timestamp, 'HH:mm:ss', '')}
@@ -140,8 +140,8 @@ const CallsPage: React.FC = () => {
         </div>
         <div className={cn(
           "max-w-[85%] md:max-w-[75%] p-4 rounded-2xl text-[13px] leading-relaxed shadow-sm transition-all",
-          isBot 
-            ? "bg-card border border-border text-foreground rounded-tl-none" 
+          isBot
+            ? "bg-card border border-border text-foreground rounded-tl-none"
             : "bg-primary text-primary-foreground rounded-tr-none"
         )}>
           {text}
@@ -153,47 +153,47 @@ const CallsPage: React.FC = () => {
   return (
     <PageShell className="p-0 overflow-hidden h-[calc(100vh-64px)]">
       <div className="flex flex-col lg:flex-row h-full">
-        
-        {/* LEFT: Registry List */}
+
+        {/* LEFT: Call List */}
         <div className={cn(
           "w-full lg:w-72 flex-shrink-0 border-r border-border flex flex-col bg-background",
           view === 'detail' && "hidden lg:flex"
         )}>
           <div className="p-5 border-b border-border space-y-4">
              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                  <Activity size={14} className="text-blue-500" /> Registry
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Activity size={14} className="text-blue-500" /> Calls
                 </h3>
                 <Badge variant="zinc" size="xs" className="rounded-md font-bold">{filteredCalls.length}</Badge>
              </div>
              <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input 
-                  type="text" 
-                  placeholder="Identity or frequency..."
+                <input
+                  type="text"
+                  placeholder="Search name or phone..."
                   className="w-full pl-9 pr-4 py-2 bg-accent/50 border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-ring transition-all"
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
                 />
              </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {callsLoading ? (
                <div className="p-12 flex flex-col items-center justify-center space-y-3 opacity-50">
                   <Loader2 className="animate-spin text-muted-foreground" size={20} />
-                  <span className="text-[10px] font-medium uppercase tracking-widest">Scanning...</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider">Loading...</span>
                </div>
             ) : filteredCalls.length === 0 ? (
                <div className="p-12 text-center">
-                  <p className="text-xs font-medium text-muted-foreground italic">No signals detected.</p>
+                  <p className="text-xs font-medium text-muted-foreground">No calls found.</p>
                </div>
             ) : (
               filteredCalls.map((call) => {
                 const isSelected = selectedCallId === call.sessionId;
                 const localOutcome = outcomes[call.sessionId];
                 return (
-                  <div 
+                  <div
                     key={call.sessionId}
                     onClick={() => handleSelectCall(call.sessionId)}
                     className={cn(
@@ -235,18 +235,40 @@ const CallsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* CENTER: Interaction Timeline */}
+        {/* CENTER: Transcript */}
         <div className={cn(
           "flex-1 flex flex-col bg-background min-w-0 h-full",
           !selectedCallId && view === 'detail' && "hidden lg:flex"
         )}>
           {!selectedCallId ? (
-            <div className="flex-1 flex items-center justify-center p-12">
-               <EmptyState 
-                 title="Node Inspection" 
-                 description="Select an interaction from the registry to view decoded signals and intelligence patterns."
-                 icon={PhoneIncoming}
-               />
+            <div className="flex-1 relative overflow-hidden flex flex-col items-center justify-center">
+               {/* Background Video Monitor */}
+               <div className="absolute inset-0 z-0">
+                  <video 
+                    src="/call-ceter.mp4" 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover opacity-60 dark:opacity-50"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/20 to-background/60" />
+               </div>
+
+               {/* Overlay Content */}
+               <div className="relative z-10 text-center px-12 animate-in fade-in zoom-in duration-1000">
+                  <div className="w-24 h-24 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-8 mx-auto shadow-2xl backdrop-blur-xl">
+                     <PhoneIncoming size={40} className="text-primary animate-pulse" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-foreground tracking-tight mb-4">Select a Call</h2>
+                  <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto leading-relaxed">
+                    Choose a conversation from the sidebar to view the full transcript, AI insights, and lead details.
+                  </p>
+                  <div className="mt-8 flex items-center justify-center gap-2">
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                     <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Live Call Monitor Ready</span>
+                  </div>
+               </div>
             </div>
           ) : (
             <>
@@ -260,7 +282,7 @@ const CallsPage: React.FC = () => {
                        <h2 className="text-sm font-bold text-foreground tracking-tight flex items-center gap-2 truncate">
                          {selectedCall?.name} <span className="text-border mx-1">•</span> <span className="text-muted-foreground font-medium">{selectedCall?.phone}</span>
                        </h2>
-                       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mt-0.5 truncate opacity-60">System ID: {selectedCallId?.substring(0, 16)}</p>
+                       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-0.5 truncate opacity-60">ID: {selectedCallId?.substring(0, 16)}</p>
                     </div>
                  </div>
                  <div className="flex items-center gap-2">
@@ -281,14 +303,14 @@ const CallsPage: React.FC = () => {
                  {transcriptLoading ? (
                    <div className="flex flex-col items-center justify-center h-full space-y-4 opacity-40">
                       <Loader2 className="animate-spin text-muted-foreground" size={32} />
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em]">Decoding Signal Stream...</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider">Loading transcript...</p>
                    </div>
                  ) : (
                    <div className="max-w-3xl mx-auto py-8">
                       {transcript?.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
                       <div className="flex items-center justify-center py-12">
-                         <div className="px-4 py-1.5 rounded-full bg-accent border border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 shadow-sm">
-                           {selectedCall?.status === 'NA' ? 'Streaming live...' : 'End of interaction'}
+                         <div className="px-4 py-1.5 rounded-full bg-accent border border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 shadow-sm">
+                           {selectedCall?.status === 'NA' ? 'Streaming live...' : 'End of conversation'}
                          </div>
                       </div>
                    </div>
@@ -298,7 +320,7 @@ const CallsPage: React.FC = () => {
           )}
         </div>
 
-        {/* RIGHT: Intelligence Panel */}
+        {/* RIGHT: Insights Panel */}
         <div className={cn(
           "w-full lg:w-80 border-l border-border bg-card flex flex-col overflow-y-auto custom-scrollbar h-full lg:h-auto",
           (!selectedCallId || view === 'list') && "hidden lg:flex"
@@ -306,31 +328,31 @@ const CallsPage: React.FC = () => {
           {!selectedCallId ? (
             <div className="p-12 text-center mt-24 opacity-30 flex flex-col items-center">
               <Zap size={32} className="mb-4" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Engine Standby</p>
+              <p className="text-xs font-semibold text-muted-foreground">Waiting for selection</p>
             </div>
           ) : insightLoading ? (
             <div className="p-12 text-center mt-24 flex flex-col items-center gap-4">
                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Synthesizing Intel...</p>
+               <p className="text-xs font-semibold text-muted-foreground opacity-60">Loading insights...</p>
             </div>
           ) : !leadInsight ? (
             <div className="p-12 text-center mt-24 opacity-30 flex flex-col items-center">
               <AlertCircle size={32} className="mb-4" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Intel Node Missing</p>
+              <p className="text-xs font-semibold text-muted-foreground">No lead data available</p>
             </div>
           ) : (
             <div className="p-6 space-y-8 pb-12">
               {/* Executive Summary */}
               <div className="space-y-4">
-                 <h3 className="text-[10px] font-bold uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
-                    <Info size={14} /> Executive Summary
+                 <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                    <Info size={14} className="text-blue-500" /> Summary
                  </h3>
-                 <p className="text-sm font-medium text-foreground leading-relaxed italic opacity-90">
+                 <p className="text-sm font-medium text-foreground leading-relaxed opacity-90">
                     "{leadInsight['Conversation Summary']}"
                  </p>
                  <div className="flex flex-wrap gap-2 pt-1">
                     <Badge variant={leadInsight.sentiment === 'Hot' ? 'danger' : leadInsight.sentiment === 'Warm' ? 'warning' : 'zinc'} className="text-[10px] font-bold">
-                       {leadInsight.sentiment} Intensity
+                       {leadInsight.sentiment}
                     </Badge>
                     <Badge variant="warning" className="text-[10px] font-bold">
                        Lead Score: {leadInsight.scoring?.score || 0}
@@ -340,8 +362,8 @@ const CallsPage: React.FC = () => {
 
               {/* Signals */}
               <div className="space-y-4 pt-6 border-t border-border">
-                 <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
-                    <Target size={14} /> Critical Signals
+                 <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                    <Target size={14} /> Key Signals
                  </h3>
                  <div className="space-y-3">
                     <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 shadow-sm">
@@ -349,19 +371,19 @@ const CallsPage: React.FC = () => {
                        <p className="text-sm font-semibold text-foreground/90">{leadInsight.concern || 'Not detected'}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 shadow-sm">
-                       <p className="text-[10px] font-bold text-emerald-500 uppercase mb-1.5 tracking-wider">Recommended Strategy</p>
-                       <p className="text-sm font-semibold text-foreground/90">{leadInsight['Action to be taken'] || 'Monitor node'}</p>
+                       <p className="text-[10px] font-bold text-emerald-500 uppercase mb-1.5 tracking-wider">Recommended Action</p>
+                       <p className="text-sm font-semibold text-foreground/90">{leadInsight['Action to be taken'] || 'Continue monitoring'}</p>
                     </div>
                  </div>
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-4 pt-8 border-t border-border">
-                 <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-[0.2em]">Node Disposition</h3>
+                 <h3 className="text-xs font-semibold text-muted-foreground">Disposition</h3>
                  {(() => {
-                    const localOutcome = outcomes[selectedCall.sessionId];
-                    const currentStatus = localOutcome?.outcome || leadInsight.status;
-                    
+                    const localOutcome = outcomes[selectedCall!.sessionId];
+                    const currentStatus = (localOutcome?.outcome || leadInsight.status) as string;
+
                     if (currentStatus === 'Converted' || currentStatus === 'Unconverted' || currentStatus === 'NotInterested' || currentStatus === 'Closed') {
                        return (
                           <div className="p-4 rounded-xl bg-accent border border-border flex flex-col items-center justify-center gap-2 animate-in fade-in zoom-in duration-300">
@@ -371,11 +393,11 @@ const CallsPage: React.FC = () => {
                              )}>
                                 {currentStatus === 'Converted' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
                              </div>
-                             <p className="text-xs font-bold uppercase tracking-widest text-foreground">
+                             <p className="text-xs font-bold uppercase tracking-wider text-foreground">
                                 Finalized as {currentStatus}
                              </p>
                              {localOutcome?.reason && (
-                                <p className="text-[10px] font-medium text-muted-foreground italic text-center">
+                                <p className="text-[10px] font-medium text-muted-foreground text-center">
                                    Reason: {localOutcome.reason}
                                 </p>
                              )}
@@ -385,17 +407,17 @@ const CallsPage: React.FC = () => {
 
                     return (
                        <div className="grid grid-cols-1 gap-2.5">
-                          <Button 
+                          <Button
                             variant="primary"
                             onClick={() => handleOpenOutcomeModal('Converted')}
-                            className="rounded-lg h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest border-none shadow-sm shadow-emerald-500/10"
+                            className="rounded-lg h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider border-none shadow-sm shadow-emerald-500/10"
                           >
                              Mark Converted
                           </Button>
-                          <Button 
+                          <Button
                             variant="secondary"
                             onClick={() => handleOpenOutcomeModal('Unconverted')}
-                            className="rounded-lg h-10 font-bold text-xs uppercase tracking-widest bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                            className="rounded-lg h-10 font-bold text-xs uppercase tracking-wider bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
                           >
                              Mark Unconverted
                           </Button>
@@ -410,21 +432,21 @@ const CallsPage: React.FC = () => {
 
       </div>
 
-      <Modal 
-        isOpen={isOutcomeModalOpen} 
+      <Modal
+        isOpen={isOutcomeModalOpen}
         onClose={() => setIsOutcomeModalOpen(false)}
-        title={`Finalize Disposition: ${outcomeType}`}
+        title={`Set Disposition: ${outcomeType}`}
       >
         <div className="space-y-5 py-4">
            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Classification Reason</label>
-              <FixedDropdown 
-                options={outcomeType === 'Converted' 
+              <label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Reason</label>
+              <FixedDropdown
+                options={outcomeType === 'Converted'
                   ? [
                     { value: 'Pricing Match', label: 'Pricing Match' },
                     { value: 'Feature Fit', label: 'Feature Fit' },
                     { value: 'Urgency', label: 'Urgency' },
-                  ] 
+                  ]
                   : [
                     { value: 'Too Expensive', label: 'Too Expensive' },
                     { value: 'Missing Features', label: 'Missing Features' },
@@ -437,23 +459,23 @@ const CallsPage: React.FC = () => {
               />
            </div>
            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Decision Notes</label>
-              <textarea 
+              <label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Notes</label>
+              <textarea
                 className="w-full h-28 p-4 bg-accent/30 rounded-xl border border-border text-[13px] font-medium focus:outline-none focus:ring-1 focus:ring-ring transition-shadow"
-                placeholder="Log internal context for this decision..."
+                placeholder="Add any relevant notes..."
                 value={outcomeForm.note}
                 onChange={(e) => setOutcomeForm(prev => ({ ...prev, note: e.target.value }))}
               />
            </div>
            <div className="flex gap-3 pt-2">
-              <Button variant="ghost" className="flex-1 rounded-lg h-11 font-semibold" onClick={() => setIsOutcomeModalOpen(false)}>Abort</Button>
-              <Button 
-                variant="primary" 
-                className="flex-1 rounded-lg h-11 font-bold shadow-sm" 
+              <Button variant="ghost" className="flex-1 rounded-lg h-11 font-semibold" onClick={() => setIsOutcomeModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                className="flex-1 rounded-lg h-11 font-bold shadow-sm"
                 onClick={handleSaveOutcome}
                 disabled={!outcomeForm.reason}
               >
-                Sync Decision
+                Save
               </Button>
            </div>
         </div>

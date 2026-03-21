@@ -15,7 +15,7 @@ import {
   parseISO
 } from 'date-fns';
 
-export type DatePreset = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'halfYearly' | 'yearly' | 'custom';
+export type DatePreset = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'halfYearly' | 'yearly' | 'allTime' | 'custom';
 
 export interface DateRange {
   from: string; // ISO (YYYY-MM-DD)
@@ -61,6 +61,10 @@ export const getRangeFromPreset = (preset: DatePreset, now: Date = new Date()): 
       from = startOfYear(now);
       to = endOfYear(now);
       break;
+    case 'allTime':
+      from = new Date(2000, 0, 1);
+      to = new Date(2100, 11, 31);
+      break;
     case 'custom':
     default:
       from = subDays(now, 6);
@@ -82,8 +86,11 @@ export const formatRangeLabel = (preset: DatePreset, from: string, to: string): 
     quarterly: 'Quarterly',
     halfYearly: 'Half-yearly',
     yearly: 'Yearly',
+    allTime: 'All-time',
     custom: 'Custom Range'
   };
+  
+  if (preset === 'allTime') return 'All-time';
   
   const presetLabel = labels[preset];
   try {

@@ -11,17 +11,17 @@ const NotFoundPage: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <PageHeader 
-        title="Intelligence Path Error" 
-        subtitle="The requested path does not exist in the CRM core."
+      <PageHeader
+        title="Page Not Found"
+        subtitle="The page you requested could not be found."
       />
-      
+
       <SectionCard>
-        <EmptyState 
+        <EmptyState
           icon={AlertCircle}
-          title="404 - Node Not Found"
-          description="The intelligence path you are trying to access does not exist or has been relocated within the IndiaGrain infrastructure."
-          ctaText="Return to Command Center"
+          title="404 - Not Found"
+          description="The page you are looking for does not exist or has been moved."
+          ctaText="Return to Dashboard"
           onCtaClick={() => navigate('/')}
         />
       </SectionCard>

@@ -122,7 +122,7 @@ export interface ReportsData {
   conversionRatio: { name: string; value: number }[];
   sentimentSplit: { name: string; value: number; color: string }[];
   engagementMetrics: { label: string; value: string; delta: string; isUp: boolean }[];
-  performanceTrend: { name: string; signals: number; conversions: number }[];
+  performanceTrend: { name: string; leads: number; conversions: number }[];
 }
 
 export interface ExportHistoryItem {

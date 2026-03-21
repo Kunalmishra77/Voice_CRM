@@ -14,11 +14,11 @@ interface EmptyStateProps {
   onAction?: () => void;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ 
-  icon: Icon, 
-  title, 
-  description, 
-  ctaText, 
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  icon: Icon,
+  title,
+  description,
+  ctaText,
   onCtaClick,
   className,
   actionLabel,
@@ -29,21 +29,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
   return (
     <div className={cn("flex flex-col items-center justify-center p-12 text-center", className)}>
-      <div className="w-20 h-20 rounded-3xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center mb-6 border border-zinc-200/50 dark:border-white/5">
-        <Icon size={40} className="text-zinc-300 dark:text-zinc-700" />
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 border border-border bg-accent">
+        <Icon size={32} className="text-muted-foreground" />
       </div>
-      <h3 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tighter uppercase italic mb-2">
+      <h3 className="text-lg font-bold text-foreground tracking-tight mb-2">
         {title}
       </h3>
-      <p className="text-sm font-medium text-zinc-500 max-w-sm mb-8 leading-relaxed">
+      <p className="text-sm text-muted-foreground max-w-sm mb-6 leading-relaxed">
         {description}
       </p>
       {btnText && btnAction && (
-        <Button 
-          variant="primary" 
-          onClick={btnAction}
-          className="rounded-2xl px-8"
-        >
+        <Button variant="primary" onClick={btnAction} className="rounded-xl px-6">
           {btnText}
         </Button>
       )}

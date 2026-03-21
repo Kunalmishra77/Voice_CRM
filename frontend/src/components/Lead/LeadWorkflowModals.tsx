@@ -83,7 +83,7 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest pl-1">
+            <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider pl-1">
               {type === 'Converted' ? 'Conversion Reason' : 'Unconverted Reason'}
             </label>
             <FixedDropdown
@@ -111,14 +111,14 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest pl-1">
+            <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider pl-1">
               {type === 'Converted' ? 'Conversion Note' : 'Internal Note'}
             </label>
             <textarea
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
               placeholder="Add at least 10 characters of context..."
-              className="w-full h-32 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl p-4 text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
+              className="w-full h-32 bg-secondary border border-border rounded-2xl p-4 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
               required
             />
           </div>

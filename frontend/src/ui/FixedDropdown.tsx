@@ -16,12 +16,12 @@ interface FixedDropdownProps {
   className?: string;
 }
 
-export const FixedDropdown: React.FC<FixedDropdownProps> = ({ 
-  options, 
-  value, 
-  onChange, 
+export const FixedDropdown: React.FC<FixedDropdownProps> = ({
+  options,
+  value,
+  onChange,
   placeholder = "Select...",
-  className 
+  className
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,19 +42,20 @@ export const FixedDropdown: React.FC<FixedDropdownProps> = ({
     <div className={cn("relative z-10", className)} ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="h-10 bg-zinc-100/50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2 transition-all hover:border-teal-500/30"
+        className="h-10 bg-secondary border border-border rounded-xl px-4 text-sm font-medium text-foreground flex items-center gap-2 transition-all hover:border-primary/30"
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
-        <ChevronDown size={12} className={cn("transition-transform duration-200", isOpen && "rotate-180")} />
+        <ChevronDown size={14} className={cn("transition-transform duration-200 text-muted-foreground", isOpen && "rotate-180")} />
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 4, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 z-[999] w-48 bg-white dark:bg-[#15151a] border border-zinc-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden p-1.5 backdrop-blur-xl"
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 z-[999] w-48 bg-card border border-border rounded-xl shadow-[var(--shadow-elevated)] overflow-hidden p-1.5"
           >
             {options.map((option) => (
               <button
@@ -64,10 +65,10 @@ export const FixedDropdown: React.FC<FixedDropdownProps> = ({
                   setIsOpen(false);
                 }}
                 className={cn(
-                  "w-full px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-between transition-colors",
-                  value === option.value 
-                    ? "bg-teal-500/10 text-teal-600 dark:text-teal-400" 
-                    : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-zinc-100"
+                  "w-full px-3 py-2.5 rounded-lg text-sm font-medium flex items-center justify-between transition-colors",
+                  value === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/70 hover:bg-accent hover:text-foreground"
                 )}
               >
                 {option.label}

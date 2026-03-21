@@ -335,10 +335,10 @@ export class MockProvider implements IDataProvider {
       ];
 
       const performanceTrend = [
-        { name: 'Week 1', signals: 120, conversions: 12 },
-        { name: 'Week 2', signals: 150, conversions: 18 },
-        { name: 'Week 3', signals: 180, conversions: 24 },
-        { name: 'Week 4', signals: 160, conversions: 22 }
+        { name: 'Week 1', leads: 120, conversions: 12 },
+        { name: 'Week 2', leads: 150, conversions: 18 },
+        { name: 'Week 3', leads: 180, conversions: 24 },
+        { name: 'Week 4', leads: 160, conversions: 22 }
       ];
 
       resolve({ conversionRatio, sentimentSplit, engagementMetrics, performanceTrend });

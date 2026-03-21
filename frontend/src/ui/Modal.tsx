@@ -13,11 +13,11 @@ interface ModalProps {
   showClose?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
   className,
   overflowHidden = true,
   showClose = true
@@ -31,26 +31,27 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={showClose ? onClose : undefined}
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "relative w-full max-w-md glass-morphism rounded-[2.5rem] shadow-2xl p-8 border border-zinc-200/50 dark:border-white/10 flex flex-col max-h-[90vh]",
+              "relative w-full max-w-md bg-card rounded-2xl shadow-[var(--shadow-elevated)] p-6 border border-border flex flex-col max-h-[90vh]",
               overflowHidden && "overflow-hidden",
               className
             )}
           >
-            <div className="flex items-center justify-between mb-6 shrink-0">
-              <h3 className="text-xl font-black tracking-tighter uppercase italic text-zinc-900 dark:text-zinc-100">{title}</h3>
+            <div className="flex items-center justify-between mb-5 shrink-0">
+              <h3 className="text-lg font-bold tracking-tight text-foreground">{title}</h3>
               {showClose && (
-                <button 
+                <button
                   onClick={onClose}
-                  className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               )}
             </div>

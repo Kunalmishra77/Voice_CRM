@@ -8,20 +8,20 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({ 
-  title, 
-  subtitle, 
-  actions, 
-  className 
+export const PageHeader: React.FC<PageHeaderProps> = ({
+  title,
+  subtitle,
+  actions,
+  className
 }) => {
   return (
     <div className={cn("flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8", className)}>
       <div className="pt-1">
-        <h2 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-sm font-medium text-zinc-500 mt-1">
+          <p className="text-sm font-medium text-muted-foreground mt-1">
             {subtitle}
           </p>
         )}

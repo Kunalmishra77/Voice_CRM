@@ -13,10 +13,10 @@ interface SectionCardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
-export const SectionCard: React.FC<SectionCardProps> = ({ 
-  title, 
-  subtitle, 
-  children, 
+export const SectionCard: React.FC<SectionCardProps> = ({
+  title,
+  subtitle,
+  children,
   className,
   headerActions,
   overflowHidden = true,
@@ -31,18 +31,18 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   };
 
   return (
-    <Card 
-      overflowHidden={overflowHidden} 
+    <Card
+      overflowHidden={overflowHidden}
       className={cn(
-        "flex flex-col bg-card rounded-xl border border-border",
-        paddingStyles[padding], 
+        "flex flex-col bg-card rounded-2xl border border-border",
+        paddingStyles[padding],
         className
       )}
     >
       {(title || subtitle || headerActions || icon) && (
         <div className="flex items-center justify-between mb-5 shrink-0 border-b border-border/50 pb-4">
           <div className="flex items-center gap-3">
-            {icon && <div className="flex-shrink-0 text-muted-foreground">{icon}</div>}
+            {icon && <div className="flex-shrink-0 text-primary">{icon}</div>}
             <div className="min-w-0">
               {title && (
                 <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">

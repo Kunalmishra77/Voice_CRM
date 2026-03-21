@@ -6,12 +6,12 @@ interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: 'xs' | 'sm' | 'md';
 }
 
-export const Badge: React.FC<BadgeProps> = ({ 
-  children, 
-  variant = 'default', 
+export const Badge: React.FC<BadgeProps> = ({
+  children,
+  variant = 'default',
   size = 'sm',
   className,
-  ...props 
+  ...props
 }) => {
   const variants = {
     default: "bg-accent text-foreground",
@@ -21,7 +21,7 @@ export const Badge: React.FC<BadgeProps> = ({
     info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 border",
     zinc: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 border",
     secondary: "bg-secondary text-secondary-foreground",
-    teal: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20 border",
+    teal: "bg-primary/10 text-primary border border-primary/20",
   };
 
   const sizes = {
@@ -31,9 +31,9 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={cn(
-        "inline-flex items-center justify-center font-semibold rounded-full",
+        "inline-flex items-center justify-center font-semibold rounded-lg",
         variants[variant],
         sizes[size],
         className

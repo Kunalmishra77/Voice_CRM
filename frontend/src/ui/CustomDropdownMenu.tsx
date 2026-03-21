@@ -12,9 +12,9 @@ interface CustomDropdownMenuProps {
   align?: 'left' | 'right';
 }
 
-export const CustomDropdownMenu: React.FC<CustomDropdownMenuProps> = ({ 
-  trigger, 
-  children, 
+export const CustomDropdownMenu: React.FC<CustomDropdownMenuProps> = ({
+  trigger,
+  children,
   className,
   align = 'right'
 }) => {
@@ -40,11 +40,12 @@ export const CustomDropdownMenu: React.FC<CustomDropdownMenuProps> = ({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 4, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
             className={cn(
-              "absolute z-[100] min-w-[200px] bg-white dark:bg-[#1c1c1e] border border-black/5 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden p-1.5",
+              "absolute z-[100] min-w-[200px] bg-card border border-border rounded-xl shadow-[var(--shadow-elevated)] overflow-hidden p-1.5",
               align === 'right' ? "right-0" : "left-0"
             )}
           >
@@ -65,24 +66,23 @@ interface DropdownMenuItemProps {
   className?: string;
 }
 
-export const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({ 
-  children, 
-  onClick, 
+export const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
+  children,
+  onClick,
   icon,
-  className 
+  className
 }) => {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-full px-3 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-colors",
-        "text-zinc-600 dark:text-zinc-400",
-        "hover:bg-black/5 dark:hover:bg-white/10",
-        "hover:text-zinc-900 dark:hover:text-zinc-100",
+        "w-full px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors",
+        "text-foreground/70",
+        "hover:bg-accent hover:text-foreground",
         className
       )}
     >
-      {icon && <span className="opacity-70">{icon}</span>}
+      {icon && <span className="opacity-60">{icon}</span>}
       {children}
     </button>
   );
@@ -103,12 +103,12 @@ interface CustomDropdownProps {
   className?: string;
 }
 
-export const CustomDropdown: React.FC<CustomDropdownProps> = ({ 
-  options, 
-  value, 
-  onChange, 
+export const CustomDropdown: React.FC<CustomDropdownProps> = ({
+  options,
+  value,
+  onChange,
   placeholder = "Select option",
-  className 
+  className
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,21 +130,22 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full bg-[#f2f2f7] dark:bg-white/5 border border-transparent rounded-xl px-4 py-2.5 text-xs font-bold flex items-center justify-between transition-all",
-          "text-zinc-900 dark:text-zinc-100 hover:bg-[#e5e5ea] dark:hover:bg-white/10"
+          "w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center justify-between transition-all",
+          "text-foreground hover:bg-accent"
         )}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
-        <ChevronDown size={14} className={cn("transition-transform duration-200 text-zinc-400", isOpen && "rotate-180")} />
+        <ChevronDown size={14} className={cn("transition-transform duration-200 text-muted-foreground", isOpen && "rotate-180")} />
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 4, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute z-[999] w-full mt-1 bg-white dark:bg-[#1c1c1e] border border-black/5 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden p-1"
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-[999] w-full mt-1 bg-card border border-border rounded-xl shadow-[var(--shadow-elevated)] overflow-hidden p-1"
           >
             <div className="max-h-60 overflow-y-auto no-scrollbar">
               {options.map((option) => (
@@ -155,10 +156,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "w-full px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-all",
-                    value === option.value 
-                      ? "bg-teal-500 text-white shadow-lg shadow-teal-500/20" 
-                      : "text-zinc-500 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    "w-full px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all",
+                    value === option.value
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-foreground/70 hover:bg-accent hover:text-foreground"
                   )}
                 >
                   {option.label}

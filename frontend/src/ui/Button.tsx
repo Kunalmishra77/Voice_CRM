@@ -15,10 +15,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   ...props
 }, ref) => {
-  const baseStyles = "inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 ring-offset-background";
-  
+  const baseStyles = "inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-50 ring-offset-background";
+
   const variants = {
-    primary: "bg-foreground text-background hover:bg-foreground/90 shadow-sm",
+    primary: "bg-primary text-primary-foreground hover:opacity-90 shadow-sm",
     secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
     outline: "border border-border bg-transparent hover:bg-accent text-foreground",
     ghost: "hover:bg-accent hover:text-foreground text-muted-foreground",
@@ -26,10 +26,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   };
 
   const sizes = {
-    sm: "h-8 px-3 text-xs rounded-md",
-    md: "h-10 px-4 py-2 text-sm rounded-lg",
+    sm: "h-8 px-3 text-xs rounded-lg",
+    md: "h-10 px-4 py-2 text-sm rounded-xl",
     lg: "h-12 px-8 text-base rounded-xl",
-    icon: "h-10 w-10 rounded-lg",
+    icon: "h-10 w-10 rounded-xl",
   };
 
   return (
