@@ -5,7 +5,7 @@ export const Footer: React.FC = () => {
     <footer className="px-6 md:px-10 py-6 border-t border-border mt-auto flex items-center justify-between text-muted-foreground">
       <div className="flex items-center gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider leading-none">
-          Powered by <span className="text-orange-500 font-bold">AI AGENTiX</span>
+          Powered by <a href="https://ai-agentix.com/" target="_blank" rel="noopener noreferrer" className="text-orange-500 font-bold hover:underline transition-all underline-offset-2">AI AGENTiX</a>
         </p>
         <span className="w-1 h-1 rounded-full bg-border" />
         <span className="text-[10px] font-medium">AI Lead Management</span>
