@@ -9,14 +9,30 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
+  <style>
+    .preloader-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 24px;
+      background: #062d37;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20200%20200'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter%20id='noiseFilter'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.65'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      opacity: 1;
+      transition: opacity 0.4s ease-out;
+    }
+    .preloader-wrap.fade-out { opacity: 0; pointer-events: none; }
+    .preloader-logo { width: 80px; height: 80px; animation: breathe 2s ease-in-out infinite; }
+    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  </style>
   <body>
     <!-- Preloader (removed by React after mount) -->
     <div id="preloader" class="preloader-wrap">
       <img src="/VMS-Logo-light.png" alt="VoiceCRM" class="preloader-logo" />
-      <div class="preloader-title">VoiceCRM</div>
-      <div class="preloader-bar-track">
-        <div class="preloader-bar-fill"></div>
-      </div>
+      <div class="preloader-title" style="color: #fff; font-family: sans-serif; font-weight: 800; letter-spacing: 0.1em; font-size: 20px;">VoiceCRM</div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

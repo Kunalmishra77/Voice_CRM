@@ -40,16 +40,16 @@ export const AppShell: React.FC = () => {
 
         {/* Global Premium Animated Mesh Background */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-          {/* Reduced and Optimized Blobs */}
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] animate-float-slow dark:hidden will-change-transform" />
-          <div className="absolute bottom-[10%] right-[-5%] w-[35%] h-[35%] rounded-full bg-orange-200/5 blur-[100px] animate-float-slower dark:hidden will-change-transform" />
+          {/* Extremely Optimized Blobs */}
+          <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] animate-float-slow dark:hidden will-change-transform opacity-60" />
+          <div className="absolute bottom-[0%] right-[-10%] w-[40%] h-[40%] rounded-full bg-orange-200/5 blur-[100px] animate-float-slower dark:hidden will-change-transform opacity-40" />
 
           {/* Dark Mode Blobs */}
-          <div className="absolute top-[-15%] left-[-5%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[150px] animate-float-slow hidden dark:block will-change-transform" />
-          <div className="absolute bottom-[5%] right-[-10%] w-[45%] h-[45%] rounded-full bg-blue-900/5 blur-[130px] animate-float-slower hidden dark:block will-change-transform" />
+          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/5 blur-[150px] animate-float-slow hidden dark:block will-change-transform" />
+          <div className="absolute bottom-[0%] right-[-15%] w-[50%] h-[50%] rounded-full bg-blue-900/5 blur-[130px] animate-float-slower hidden dark:block will-change-transform" />
           
-          {/* Subtle noise texture */}
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.015] dark:opacity-[0.03] contrast-150 brightness-100" />
+          {/* Ultra-lightweight noise texture (Base64 optimized) */}
+          <div className="absolute inset-0 bg-repeat opacity-[0.015] dark:opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0%200%20200%20200'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter%20id='noiseFilter'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.65'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
         </div>
       </div>
     </div>

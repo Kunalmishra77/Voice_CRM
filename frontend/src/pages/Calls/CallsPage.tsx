@@ -245,7 +245,7 @@ const CallsPage: React.FC = () => {
                {/* Background Video Monitor */}
                <div className="absolute inset-0 z-0">
                   <video 
-                    src="/call-ceter.mp4" 
+                    src="/call-center.mp4" 
                     autoPlay 
                     loop 
                     muted 
