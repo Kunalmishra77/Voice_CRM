@@ -219,9 +219,11 @@ const DashboardPage: React.FC = () => {
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
                         <Tooltip cursor={{ fill: 'var(--accent)' }} content={<CustomChartTooltip />} />
-                        <Bar dataKey="hot" fill={CHART_COLORS.hot} radius={[3, 3, 0, 0]} barSize={18} stackId="a" />
-                        <Bar dataKey="warm" fill={CHART_COLORS.warm} radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
-                        <Bar dataKey="cold" fill={CHART_COLORS.cold} radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
+                        <Bar dataKey="hot" name="Hot" fill="#ef4444" radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
+                        <Bar dataKey="warm" name="Warm" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
+                        <Bar dataKey="cold" name="Cold" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
+                        <Bar dataKey="converted" name="Converted" fill="#06b6d4" radius={[0, 0, 0, 0]} barSize={18} stackId="a" />
+                        <Bar dataKey="lost" name="Lost" fill="#64748b" radius={[3, 3, 0, 0]} barSize={18} stackId="a" />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (

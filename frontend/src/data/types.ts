@@ -41,6 +41,7 @@ export interface TrendPoint {
   warm: number;
   cold: number;
   converted: number;
+  lost: number;
   from: string;
   to: string;
 }

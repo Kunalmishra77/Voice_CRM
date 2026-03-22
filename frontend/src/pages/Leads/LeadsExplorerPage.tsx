@@ -248,9 +248,11 @@ const LeadsExplorerPage: React.FC = () => {
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
                       <Tooltip cursor={{ fill: 'var(--accent)' }} content={<CustomChartTooltip />} />
-                      <Bar dataKey="hot" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} stackId="a" />
-                      <Bar dataKey="warm" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
-                      <Bar dataKey="cold" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
+                      <Bar dataKey="hot" name="Hot" fill="#ef4444" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
+                      <Bar dataKey="warm" name="Warm" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
+                      <Bar dataKey="cold" name="Cold" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
+                      <Bar dataKey="converted" name="Converted" fill="#06b6d4" radius={[0, 0, 0, 0]} barSize={24} stackId="a" />
+                      <Bar dataKey="lost" name="Lost" fill="#64748b" radius={[4, 4, 0, 0]} barSize={24} stackId="a" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

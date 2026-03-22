@@ -75,7 +75,6 @@ export class BackendProvider implements IDataProvider {
       startDate = subDays(endDate, 89);
     }
 
-    const interval = eachDayOfInterval({ start: startDate, end: endDate });
     return interval.map(day => {
       const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
       return {
@@ -84,6 +83,7 @@ export class BackendProvider implements IDataProvider {
         warm: dayLeads.filter(l => l.sentiment === 'Warm' || l.sentiment === 'Average' || !l.sentiment).length,
         cold: dayLeads.filter(l => l.sentiment === 'Cold').length,
         converted: dayLeads.filter(l => (l.status as any) === 'crm_converted').length,
+        lost: dayLeads.filter(l => ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes((l.status as any))).length,
         from: safeFormat(day, 'yyyy-MM-dd'),
         to: safeFormat(day, 'yyyy-MM-dd')
       };
