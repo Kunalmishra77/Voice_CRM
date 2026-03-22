@@ -48,6 +48,12 @@ const LiveCallsPage: React.FC = () => {
     queryFn: () => dataProvider.getSessions(dateRange),
   });
 
+  const { data: fullTranscript } = useQuery({
+    queryKey: ['live-transcript', selectedId],
+    queryFn: () => dataProvider.getConversation(selectedId!),
+    enabled: !!selectedId,
+  });
+
   // Filtered sessions based on global filters
   const filteredSessions = useMemo(() => {
     let list = [...activeSessions];
@@ -197,7 +203,7 @@ const LiveCallsPage: React.FC = () => {
               </div>
               <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar scroll-smooth">
                  <div className="max-w-3xl mx-auto space-y-8 pb-20">
-                    {visibleTranscript.map((msg, i) => (
+                    {visibleTranscript.map((msg: ChatMessage, i: number) => (
                         <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex flex-col", !!msg.bot_msg ? "items-start" : "items-end")}>
                           <div className={cn("flex items-center gap-2 mb-2 px-1", !msg.bot_msg && "flex-row-reverse")}>
                              <span className="text-[10px] font-semibold text-muted-foreground">{!!msg.bot_msg ? 'AI Agent' : 'Customer'}</span>

@@ -141,6 +141,8 @@ export interface FetchLeadsParams {
   sentiment?: string;
   limit?: number;
   worked?: 'yes' | 'no' | 'all';
+  agent?: string | null;
+  stage?: string | null;
 }
 
 export interface UpdateLeadStatusParams {
