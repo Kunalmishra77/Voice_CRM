@@ -75,6 +75,7 @@ export class BackendProvider implements IDataProvider {
       startDate = subDays(endDate, 89);
     }
 
+    const interval = eachDayOfInterval({ start: startDate, end: endDate });
     return interval.map(day => {
       const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
       return {
