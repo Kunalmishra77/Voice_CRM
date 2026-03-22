@@ -24,6 +24,8 @@ import { useGlobalFilters } from '../state/globalFiltersStore';
 import { type DatePreset, formatRangeLabel } from '../utils/dateRange';
 import { CustomRangeModal } from '../ui/CustomRangeModal';
 import { cn } from '../lib/utils';
+import { useProfile } from '../state/profileStore';
+import { useAuth } from '../state/authStore';
 
 interface TopbarProps {
   onMenuClick?: () => void;
@@ -32,6 +34,8 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
   const { theme, toggleTheme } = useTheme();
+  const { profile } = useProfile();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -78,6 +82,21 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
       toast.success(`Range updated to ${preset}`);
     }
   };
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Successfully signed out.");
+    navigate('/login');
+  };
+
+  const initials = profile.name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'U';
+
+  const avatarColor = localStorage.getItem('voicecrm-avatar-color') || 'var(--brand-700)';
 
   return (
     <header className="h-16 px-4 md:px-6 flex items-center justify-between sticky top-0 z-[40] bg-background/80 backdrop-blur-xl border-b border-border">
@@ -179,32 +198,40 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
           align="right"
           trigger={
             <div className="flex items-center gap-2.5 p-1.5 rounded-xl cursor-pointer hover:bg-accent transition-colors group">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm bg-primary">
-                A
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                style={{ background: avatarColor }}
+              >
+                {initials}
               </div>
               <div className="hidden lg:flex flex-col items-start pr-1">
-                <span className="text-sm font-semibold text-foreground leading-none">Admin</span>
-                <span className="text-[10px] text-muted-foreground">Manager</span>
+                <span className="text-sm font-semibold text-foreground leading-none">{profile.name}</span>
+                <span className="text-[10px] text-muted-foreground">{profile.role}</span>
               </div>
               <ChevronDown size={14} className="text-muted-foreground hidden lg:block" />
             </div>
           }
         >
           <div className="px-3 py-3 flex items-center gap-3 border-b border-border mb-1">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold bg-primary shadow-sm">A</div>
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm"
+              style={{ background: avatarColor }}
+            >
+              {initials}
+            </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Admin</p>
-              <p className="text-[10px] text-muted-foreground">admin@voicecrm.app</p>
+              <p className="text-sm font-semibold text-foreground">{profile.name}</p>
+              <p className="text-[10px] text-muted-foreground">{profile.email}</p>
             </div>
           </div>
-          <DropdownMenuItem onClick={() => { navigate('/settings'); toast.info("Profile settings"); }} icon={<UserIcon size={14} />}>
+          <DropdownMenuItem onClick={() => navigate('/profile')} icon={<UserIcon size={14} />}>
             My Profile
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate('/settings')} icon={<Settings size={14} />}>
             Settings
           </DropdownMenuItem>
           <div className="h-px bg-border my-1" />
-          <DropdownMenuItem onClick={() => toast.info("Sign out is not available in this version.")} icon={<LogOut size={14} />} className="text-red-500 hover:text-red-600 hover:bg-red-500/10">
+          <DropdownMenuItem onClick={handleLogout} icon={<LogOut size={14} />} className="text-red-500 hover:text-red-600 hover:bg-red-500/10">
             Sign Out
           </DropdownMenuItem>
         </CustomDropdownMenu>

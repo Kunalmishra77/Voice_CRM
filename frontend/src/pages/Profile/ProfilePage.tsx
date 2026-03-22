@@ -47,16 +47,18 @@ interface FieldRowProps {
 }
 
 const FieldRow: React.FC<FieldRowProps> = ({ icon: Icon, label, children, iconColor }) => (
-  <div className="flex items-start gap-4 p-4 rounded-2xl bg-secondary border border-border">
+  <div className="flex items-center gap-4 p-4 rounded-2xl bg-secondary/40 border border-border/50 hover:border-primary/30 transition-all group">
     <div
-      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border"
+      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-border/50 shadow-sm transition-transform group-hover:scale-105"
       style={iconColor ? { background: iconColor + '15', color: iconColor } : { background: 'var(--brand-50)', color: 'var(--brand-500)' }}
     >
-      <Icon size={18} />
+      <Icon size={20} />
     </div>
     <div className="flex-1 min-w-0">
-      <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider block mb-1.5">{label}</label>
-      {children}
+      <label className="text-[10px] font-bold uppercase text-muted-foreground/60 tracking-widest block mb-0.5">{label}</label>
+      <div className="text-sm font-bold text-foreground tracking-tight">
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -125,15 +127,15 @@ const ProfilePage: React.FC = () => {
 
   return (
     <PageShell>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-none">My Profile</h1>
-          <p className="text-muted-foreground font-medium mt-1">Manage your personal information and preferences.</p>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tighter leading-none">My Profile</h1>
+          <p className="text-muted-foreground font-medium mt-2 text-lg">Manage your personal information and preferences.</p>
         </div>
         <div className="flex items-center gap-3">
           {isEditing ? (
             <>
-              <Button variant="outline" size="sm" onClick={handleCancel} className="rounded-2xl px-5 h-10 text-xs font-semibold">
+              <Button variant="outline" size="sm" onClick={handleCancel} className="rounded-2xl px-6 h-11 text-xs font-bold border-border/60">
                 Cancel
               </Button>
               <Button
@@ -141,9 +143,9 @@ const ProfilePage: React.FC = () => {
                 size="sm"
                 onClick={handleSave}
                 disabled={!isDirty}
-                className="rounded-2xl px-6 h-10 text-xs font-semibold shadow-sm bg-primary text-primary-foreground hover:scale-105 transition-transform"
+                className="rounded-2xl px-8 h-11 text-xs font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:scale-105 transition-all"
               >
-                <Save size={14} className="mr-2" /> Save Changes
+                <Save size={16} className="mr-2" /> Save Changes
               </Button>
             </>
           ) : (
@@ -151,9 +153,9 @@ const ProfilePage: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={() => setIsEditing(true)}
-              className="rounded-2xl px-6 h-10 text-xs font-semibold shadow-sm bg-primary text-primary-foreground hover:scale-105 transition-transform"
+              className="rounded-2xl px-8 h-11 text-xs font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:scale-105 transition-all"
             >
-              <Edit3 size={14} className="mr-2" /> Edit Profile
+              <Edit3 size={16} className="mr-2" /> Edit Profile
             </Button>
           )}
         </div>
@@ -162,38 +164,51 @@ const ProfilePage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-10">
         {/* Left column — Avatar + Info Card */}
         <div className="lg:col-span-4 flex flex-col gap-8">
-          <SectionCard className="items-center text-center">
-            {/* Avatar */}
-            <div className="relative group mb-4">
-              <div
-                className="w-24 h-24 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg transition-transform group-hover:scale-105"
+          <SectionCard className="items-center text-center p-10 bg-card/30 backdrop-blur-md border-border/40 relative overflow-hidden group">
+            {/* Background Decorative Gradient */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+            
+            {/* Avatar Section */}
+            <div className="relative mb-8 flex justify-center">
+              <div 
+                className="absolute inset-0 blur-3xl opacity-20 scale-150 transition-all duration-700 group-hover:opacity-30 group-hover:scale-[1.7] rounded-full"
                 style={{ background: avatarColor }}
+              />
+              <div
+                className="w-36 h-36 rounded-full flex items-center justify-center text-white text-6xl font-black shadow-2xl relative z-10 transition-all duration-500 group-hover:scale-105 group-hover:rotate-3 ring-4 ring-white/5"
+                style={{ background: `linear-gradient(135deg, ${avatarColor}, ${avatarColor}dd)` }}
               >
                 {initials}
               </div>
               {isEditing && (
-                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground">
-                  <Camera size={14} />
+                <div className="absolute bottom-1 right-1/2 translate-x-[60px] w-11 h-11 rounded-full bg-primary text-white shadow-xl flex items-center justify-center z-20 animate-in zoom-in duration-300 border-4 border-[#050910]">
+                  <Camera size={20} />
                 </div>
               )}
             </div>
 
-            <h2 className="text-lg font-bold text-foreground tracking-tight">{draft.name || 'Unnamed'}</h2>
-            <p className="text-xs text-muted-foreground font-medium">{draft.email}</p>
-            <Badge variant="teal" className="mt-2 text-[10px] font-semibold px-3 py-1 rounded-full uppercase">{draft.role}</Badge>
+            <div className="space-y-2 mb-8 relative z-10">
+              <h2 className="text-3xl font-black text-foreground tracking-tighter">{draft.name || 'Unnamed'}</h2>
+              <p className="text-[15px] text-muted-foreground/60 font-bold tracking-tight">{draft.email}</p>
+            </div>
+            
+            <div className="relative z-10 px-8 py-2.5 rounded-2xl bg-primary/5 border border-primary/20 inline-flex items-center gap-2 mb-10 shadow-inner group/role">
+               <Shield size={14} className="text-primary group-hover/role:scale-110 transition-transform" />
+               <span className="text-[11px] font-black uppercase tracking-[0.25em] text-primary">{draft.role}</span>
+            </div>
 
             {/* Avatar color picker (edit mode) */}
             {isEditing && (
-              <div className="mt-6 w-full">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-3">Avatar Color</p>
-                <div className="flex flex-wrap gap-2 justify-center">
+              <div className="mt-4 mb-8 w-full animate-in fade-in slide-in-from-top-4 duration-500 relative z-10">
+                <p className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest mb-5">Customize Avatar Color</p>
+                <div className="flex flex-wrap gap-3 justify-center">
                   {AVATAR_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setAvatarColor(color)}
                       className={cn(
-                        "w-8 h-8 rounded-xl transition-all border-2",
-                        avatarColor === color ? "scale-110 border-foreground shadow-sm" : "border-transparent hover:scale-105"
+                        "w-9 h-9 rounded-2xl transition-all border-4",
+                        avatarColor === color ? "scale-125 border-primary shadow-lg z-20" : "border-transparent hover:scale-110 opacity-60 hover:opacity-100 hover:rotate-12"
                       )}
                       style={{ background: color }}
                     />
@@ -202,35 +217,35 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
 
-            {/* Quick stats */}
-            <div className="mt-6 w-full grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-secondary border border-border text-center">
-                <p className="text-lg font-bold text-foreground">{draft.department}</p>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">Department</p>
+            {/* Quick stats with modern glass effect */}
+            <div className="w-full grid grid-cols-2 gap-5 relative z-10">
+              <div className="p-5 rounded-3xl bg-[#0d121f]/40 border border-white/[0.03] text-center hover:bg-[#0d121f]/60 hover:border-primary/20 transition-all group/stat">
+                <p className="text-lg font-black text-foreground tracking-tight group-hover/stat:scale-105 transition-transform">{draft.department}</p>
+                <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mt-1.5">Department</p>
               </div>
-              <div className="p-3 rounded-xl bg-secondary border border-border text-center">
-                <p className="text-lg font-bold text-foreground">{draft.language}</p>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">Language</p>
+              <div className="p-5 rounded-3xl bg-[#0d121f]/40 border border-white/[0.03] text-center hover:bg-[#0d121f]/60 hover:border-primary/20 transition-all group/stat">
+                <p className="text-lg font-black text-foreground tracking-tight group-hover/stat:scale-105 transition-transform">{draft.language}</p>
+                <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mt-1.5">Language</p>
               </div>
             </div>
           </SectionCard>
 
           {/* Account Status */}
           <SectionCard title="Account Status" subtitle="Your account health." icon={<Shield size={18} className="text-emerald-500" />}>
-            <div className="space-y-4 py-1">
+            <div className="space-y-3 py-1">
               {[
                 { label: 'Account Status', value: 'Active', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                { label: 'Role', value: draft.role, icon: Shield, color: '', bg: '' },
+                { label: 'Role', value: draft.role, icon: Shield, color: 'text-primary', bg: 'bg-primary/10' },
                 { label: 'Last Login', value: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), icon: Clock, color: 'text-blue-500', bg: 'bg-blue-500/10' },
                 { label: 'Session', value: 'Current', icon: Activity, color: 'text-amber-500', bg: 'bg-amber-500/10' },
               ].map((item, i) => (
-                <div key={i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-accent transition-all">
-                  <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", item.bg, item.color)} style={!item.color ? { background: 'var(--brand-50)', color: 'var(--brand-500)' } : {}}>
-                    <item.icon size={16} />
+                <div key={i} className="flex items-center gap-4 p-3.5 rounded-2xl hover:bg-secondary/60 border border-transparent hover:border-border/50 transition-all group">
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110", item.bg, item.color)}>
+                    <item.icon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</p>
-                    <p className="text-xs font-bold text-foreground mt-0.5">{item.value}</p>
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{item.label}</p>
+                    <p className="text-sm font-bold text-foreground mt-0.5 tracking-tight">{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -240,19 +255,19 @@ const ProfilePage: React.FC = () => {
 
         {/* Right column — Editable Fields */}
         <div className="lg:col-span-8 flex flex-col gap-8">
-          <SectionCard title="Personal Information" subtitle="Your basic details." icon={<User size={18} style={{ color: 'var(--brand-500)' }} />}>
-            <div className="space-y-4 py-1">
+          <SectionCard title="Personal Information" subtitle="Your basic details." icon={<User size={18} className="text-primary" />}>
+            <div className="space-y-5 py-1">
               <FieldRow icon={User} label="Full Name">
                 {isEditing ? (
                   <input
                     type="text"
                     value={draft.name}
                     onChange={(e) => handleChange('name', e.target.value)}
-                    className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                    className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     placeholder="Your full name"
                   />
                 ) : (
-                  <p className="text-sm font-semibold text-foreground">{draft.name}</p>
+                  <span>{draft.name}</span>
                 )}
               </FieldRow>
 
@@ -262,11 +277,11 @@ const ProfilePage: React.FC = () => {
                     type="email"
                     value={draft.email}
                     onChange={(e) => handleChange('email', e.target.value)}
-                    className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                    className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     placeholder="your@email.com"
                   />
                 ) : (
-                  <p className="text-sm font-semibold text-foreground">{draft.email}</p>
+                  <span>{draft.email}</span>
                 )}
               </FieldRow>
 
@@ -276,26 +291,26 @@ const ProfilePage: React.FC = () => {
                     type="tel"
                     value={draft.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
-                    className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                    className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     placeholder="+1 (555) 000-0000"
                   />
                 ) : (
-                  <p className="text-sm font-semibold text-foreground">{draft.phone}</p>
+                  <span>{draft.phone}</span>
                 )}
               </FieldRow>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <FieldRow icon={Briefcase} label="Role" iconColor="#8b5cf6">
                   {isEditing ? (
                     <select
                       value={draft.role}
                       onChange={(e) => handleChange('role', e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     >
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   ) : (
-                    <p className="text-sm font-semibold text-foreground">{draft.role}</p>
+                    <span>{draft.role}</span>
                   )}
                 </FieldRow>
 
@@ -304,12 +319,12 @@ const ProfilePage: React.FC = () => {
                     <select
                       value={draft.department}
                       onChange={(e) => handleChange('department', e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     >
                       {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
                   ) : (
-                    <p className="text-sm font-semibold text-foreground">{draft.department}</p>
+                    <span>{draft.department}</span>
                   )}
                 </FieldRow>
               </div>
@@ -317,19 +332,19 @@ const ProfilePage: React.FC = () => {
           </SectionCard>
 
           <SectionCard title="Preferences" subtitle="Regional and display settings." icon={<Globe2 size={18} className="text-blue-500" />}>
-            <div className="space-y-4 py-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-5 py-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <FieldRow icon={Clock} label="Timezone" iconColor="#0ea5e9">
                   {isEditing ? (
                     <select
                       value={draft.timezone}
                       onChange={(e) => handleChange('timezone', e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     >
                       {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>)}
                     </select>
                   ) : (
-                    <p className="text-sm font-semibold text-foreground">{draft.timezone.replace(/_/g, ' ')}</p>
+                    <span>{draft.timezone.replace(/_/g, ' ')}</span>
                   )}
                 </FieldRow>
 
@@ -338,12 +353,12 @@ const ProfilePage: React.FC = () => {
                     <select
                       value={draft.language}
                       onChange={(e) => handleChange('language', e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      className="w-full bg-card/50 border border-border/60 rounded-xl py-2 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                     >
                       {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
                     </select>
                   ) : (
-                    <p className="text-sm font-semibold text-foreground">{draft.language}</p>
+                    <span>{draft.language}</span>
                   )}
                 </FieldRow>
               </div>
@@ -354,11 +369,11 @@ const ProfilePage: React.FC = () => {
                     value={draft.bio}
                     onChange={(e) => handleChange('bio', e.target.value)}
                     rows={3}
-                    className="w-full bg-card border border-border rounded-xl py-2.5 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all resize-none"
+                    className="w-full bg-card/50 border border-border/60 rounded-xl py-2.5 px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all resize-none"
                     placeholder="Write a short bio..."
                   />
                 ) : (
-                  <p className="text-sm text-foreground">{draft.bio || <span className="text-muted-foreground italic">No bio set</span>}</p>
+                  <span className={!draft.bio ? "text-muted-foreground/50 italic font-medium" : ""}>{draft.bio || 'No bio set'}</span>
                 )}
               </FieldRow>
             </div>
@@ -366,18 +381,18 @@ const ProfilePage: React.FC = () => {
 
           {/* Danger zone */}
           <SectionCard title="Danger Zone" subtitle="Irreversible actions." icon={<AlertCircle size={18} className="text-rose-500" />}>
-            <div className="flex items-center justify-between p-5 rounded-2xl border border-rose-500/20 bg-rose-500/5">
+            <div className="flex items-center justify-between p-6 rounded-[2rem] border border-rose-500/20 bg-rose-500/5 group hover:bg-rose-500/10 transition-all">
               <div>
-                <p className="text-sm font-bold text-foreground">Reset Profile</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Revert all profile data to default values.</p>
+                <p className="text-base font-black text-foreground tracking-tight">Reset Profile</p>
+                <p className="text-xs text-muted-foreground font-bold mt-1">Revert all profile data to default values.</p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => { if (confirm('Reset all profile data to defaults?')) handleReset(); }}
-                className="rounded-2xl px-5 h-9 text-xs font-semibold border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
+                className="rounded-2xl px-6 h-11 text-xs font-black border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
               >
-                <RotateCcw size={14} className="mr-2" /> Reset
+                <RotateCcw size={16} className="mr-2" /> Reset
               </Button>
             </div>
           </SectionCard>

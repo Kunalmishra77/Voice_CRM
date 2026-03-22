@@ -76,7 +76,7 @@ const BUCKET_OPTIONS = [
 const LeadsExplorerPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dateRange, searchQuery, setSearchQuery } = useGlobalFilters();
+  const { dateRange, searchQuery, selectedAgent, selectedStage } = useGlobalFilters();
   const range = dateRange;
   const queryParams = new URLSearchParams(location.search);
 
@@ -90,25 +90,27 @@ const LeadsExplorerPage: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => setIsMounted(true), 100);
-    setLocalSearch(searchQuery);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setIsExportOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Sync local search with global search
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
 
   const [workflowModal, setWorkflowModal] = useState<{ isOpen: boolean; lead: LeadInsightRow | null; type: 'Converted' | 'NotInterested' | 'Closed' | null }>({
     isOpen: false, lead: null, type: null
   });
 
   const { data: leads, isLoading: leadsLoading } = useQuery({
-    queryKey: ['leads-table', dateRange, bucket, localSearch],
-    queryFn: () => dataProvider.getLeads({ range, bucket, search: localSearch }),
+    queryKey: ['leads-table', dateRange, bucket, localSearch, selectedAgent, selectedStage],
+    queryFn: () => dataProvider.getLeads({ 
+      range, 
+      bucket, 
+      search: localSearch,
+      agent: selectedAgent,
+      stage: selectedStage
+    }),
   });
 
   const { data: kpis } = useQuery({

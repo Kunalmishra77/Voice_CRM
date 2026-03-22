@@ -31,7 +31,7 @@ interface LiveSession extends ChatSession {
 
 const LiveCallsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { dateRange } = useGlobalFilters();
+  const { dateRange, searchQuery, selectedAgent, selectedStage } = useGlobalFilters();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
@@ -48,11 +48,29 @@ const LiveCallsPage: React.FC = () => {
     queryFn: () => dataProvider.getSessions(dateRange),
   });
 
-  const { data: fullTranscript } = useQuery({
-    queryKey: ['live-transcript', selectedId],
-    queryFn: () => dataProvider.getConversation(selectedId!),
-    enabled: !!selectedId,
-  });
+  // Filtered sessions based on global filters
+  const filteredSessions = useMemo(() => {
+    let list = [...activeSessions];
+    const search = searchQuery.toLowerCase();
+    
+    if (search) {
+      list = list.filter(s => 
+        s.name.toLowerCase().includes(search) || 
+        s.phone.includes(search) ||
+        s.lastMessage.toLowerCase().includes(search)
+      );
+    }
+    
+    if (selectedAgent) {
+      list = list.filter(s => s.agentName === selectedAgent);
+    }
+    
+    if (selectedStage) {
+      list = list.filter(s => s.status === selectedStage);
+    }
+    
+    return list;
+  }, [activeSessions, searchQuery, selectedAgent, selectedStage]);
 
   useEffect(() => {
     if (!initialSessions) return;
@@ -84,13 +102,25 @@ const LiveCallsPage: React.FC = () => {
           return s;
         });
       });
+    }, 4000);
+
+    const transcriptTimer = setInterval(() => {
       setTranscriptIndex(prev => {
         const next = { ...prev };
-        activeSessions.forEach(s => { if (!s.isRinging) next[s.sessionId] = (next[s.sessionId] || 0) + 1; });
+        setActiveSessions(currentSessions => {
+          currentSessions.forEach(s => { 
+            if (!s.isRinging) next[s.sessionId] = (next[s.sessionId] || 0) + 1; 
+          });
+          return currentSessions;
+        });
         return next;
       });
-    }, 4000);
-    return () => clearInterval(timer);
+    }, 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(transcriptTimer);
+    };
   }, [initialSessions]);
 
   useEffect(() => {
@@ -131,7 +161,7 @@ const LiveCallsPage: React.FC = () => {
              <Button variant="primary" size="sm" className="w-full rounded-2xl h-10 shadow-lg" onClick={() => setIsBroadcastModalOpen(true)}><Radio size={14} className="mr-2" /> New Broadcast</Button>
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2">
-            {isLoading ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />) : activeSessions.length === 0 ? <EmptyState icon={Inbox} title="No active calls" description="Waiting for incoming calls..." /> : activeSessions.map((sig) => (
+            {isLoading ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />) : filteredSessions.length === 0 ? <EmptyState icon={Inbox} title="No active calls" description={searchQuery ? "No matches found." : "Waiting for incoming calls..."} /> : filteredSessions.map((sig) => (
                 <div key={sig.sessionId} onClick={() => { setSelectedId(sig.sessionId); setView('detail'); }} className={cn("group p-4 rounded-2xl transition-all cursor-pointer border", selectedId === sig.sessionId ? "bg-primary/5 border-primary/30 shadow-sm" : "border-transparent hover:bg-accent hover:border-border")}>
                   <div className="flex items-center gap-3 mb-2">
                     <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm bg-primary", sig.isRinging ? "bg-amber-500 animate-bounce" : "")}>{sig.isRinging ? <PhoneCall size={14} /> : sig.name[0]}</div>

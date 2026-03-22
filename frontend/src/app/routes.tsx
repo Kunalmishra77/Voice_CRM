@@ -1,7 +1,8 @@
 import React, { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../layout/AppShell';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '../state/authStore';
 
 // Lazy load pages for performance
 const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'));
@@ -14,6 +15,8 @@ const TasksFollowupsPage = lazy(() => import('../pages/Tasks/TasksFollowupsPage'
 const ReportsPage = lazy(() => import('../pages/Reports/ReportsPage'));
 const ExportsPage = lazy(() => import('../pages/Exports/ExportsPage'));
 const SettingsPage = lazy(() => import('../pages/Settings/SettingsPage'));
+const ProfilePage = lazy(() => import('../pages/Profile/ProfilePage'));
+const LoginPage = lazy(() => import('../pages/Auth/LoginPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 const PageLoader = () => (
@@ -22,11 +25,24 @@ const PageLoader = () => (
   </div>
 );
 
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+};
+
 export const AppRoutes: React.FC = () => {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route element={<AppShell />}>
+        <Route path="/login" element={<LoginPage />} />
+        
+        <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<Navigate to="/" replace />} />
           
@@ -46,6 +62,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="exports" element={<ExportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           
           {/* Fallback */}
           <Route path="*" element={<NotFoundPage />} />
