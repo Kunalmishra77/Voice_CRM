@@ -104,14 +104,18 @@ export const leadService = {
       if (stage === 'Converted') {
         query = query.eq(COLS.leads.status, CRM_CONVERTED);
       } else if (stage === 'Lost') {
-        query = query.eq(COLS.leads.status, CRM_LOST);
+        // Support both new 'crm_lost' and legacy lost statuses
+        const lostTerms = [CRM_LOST, ...LOST_STATUSES];
+        query = query.in(COLS.leads.status, lostTerms);
       } else if (stage === 'Pending') {
-        query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
+        const finalized = [CRM_CONVERTED, CRM_LOST, ...LOST_STATUSES];
+        query = query.not(COLS.leads.status, 'in', `(${finalized.join(',')})`);
       } else if (['Hot', 'Warm', 'Cold', 'Average'].includes(stage)) {
-        // These are sentiment buckets, usually only for non-finalized leads
-        query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
+        // Sentiment-based filtering for non-finalized leads
+        const finalized = [CRM_CONVERTED, CRM_LOST, ...LOST_STATUSES];
+        query = query.not(COLS.leads.status, 'in', `(${finalized.join(',')})`);
         if (stage === 'Average') {
-          query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average`);
+          query = query.or(`sentiment.is.null,sentiment.eq.Average`);
         } else {
           query = query.eq(COLS.leads.sentiment, stage);
         }
@@ -161,25 +165,37 @@ export const dashboardService = {
     if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
     if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     const { data, count } = await query;
-    const status_counts: any = { [CRM_CONVERTED]: 0, [CRM_LOST]: 0 };
-    const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, null: 0 };
+    
+    const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, Average: 0 };
+    let converted = 0;
+    let lost = 0;
     const phones = new Set();
+    
     (data || []).forEach((row: any) => {
-        const s = row[COLS.leads.status] || 'unknown';
-        const sent = row[COLS.leads.sentiment] || 'null';
-        status_counts[s] = (status_counts[s] || 0) + 1;
-        if (s !== CRM_CONVERTED && s !== CRM_LOST) sentiment_counts[sent] = (sentiment_counts[sent] || 0) + 1;
+        const s = (row[COLS.leads.status] || '').toLowerCase();
+        const sent = row[COLS.leads.sentiment] || 'Average';
+        
+        if (s === CRM_CONVERTED) {
+          converted++;
+        } else if (s === CRM_LOST || LOST_STATUSES.includes(s)) {
+          lost++;
+        } else {
+          // It's a pending/active lead, count its sentiment
+          sentiment_counts[sent] = (sentiment_counts[sent] || 0) + 1;
+        }
+        
         if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
     });
+
     const bucket_counts = {
       all: count || 0,
       Hot: sentiment_counts['Hot'] || 0,
       Warm: sentiment_counts['Warm'] || 0,
       Cold: sentiment_counts['Cold'] || 0,
-      Average: sentiment_counts['null'] || 0,
-      Converted: status_counts[CRM_CONVERTED] || 0,
-      Lost: status_counts[CRM_LOST] || 0,
-      Pending: (count || 0) - (status_counts[CRM_CONVERTED] || 0) - (status_counts[CRM_LOST] || 0)
+      Average: sentiment_counts['Average'] || 0,
+      Converted: converted,
+      Lost: lost,
+      Pending: (count || 0) - converted - lost
     };
     return {
       total_leads: count || 0,
