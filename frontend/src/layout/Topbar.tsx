@@ -168,7 +168,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
             <div className="p-1 min-w-[280px]">
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Notifications</span>
-                <button onClick={() => { setNotifCount(0); toast.success("All notifications cleared"); }} className="text-[10px] font-medium text-primary hover:underline">Mark all read</button>
+                <button onClick={() => { setNotifCount(0); toast.success("All notifications cleared"); }} className="text-[10px] font-medium text-primary hover:underline cursor-pointer">Mark all read</button>
               </div>
               {[
                 { icon: PhoneCall, color: 'text-emerald-500', bg: 'bg-emerald-500/10', title: 'New call completed', desc: 'AI agent finished call with a lead', time: '2m ago' },

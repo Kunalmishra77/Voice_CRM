@@ -121,34 +121,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
         ))}
       </nav>
 
-      {/* Edge-to-Edge Video Section */}
-      {!collapsed && (
-        <div className="mt-auto w-full border-t border-border/20 bg-slate-950/20 overflow-hidden">
-          <div className="relative group h-28 flex items-center justify-center">
-            {/* Dark base for blending */}
-            <div className="absolute inset-0 bg-slate-950/40 pointer-events-none" />
-            
-            <video 
-              src="/call-icon.mp4" 
-              autoPlay 
-              loop 
-              muted 
-              playsInline
-              className="relative z-10 w-full h-full object-cover mix-blend-screen opacity-90 transition-opacity group-hover:opacity-100"
-            />
-            
-            {/* Subtle glass overlay */}
-            <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/20 via-transparent to-white/5 pointer-events-none" />
-          </div>
-        </div>
-      )}
-
-      {/* Optimized Collapse Toggle */}
+      {/* Collapse Toggle */}
       <div className="p-4 shrink-0 hidden lg:flex justify-center border-t border-border/20">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 text-muted-foreground/40 hover:bg-primary/10 hover:text-primary active:scale-95",
+            "inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 cursor-pointer text-muted-foreground/40 hover:bg-primary/10 hover:text-primary active:scale-95",
             collapsed ? "justify-center px-0 w-10 h-10" : "w-full justify-start"
           )}
         >

@@ -8,6 +8,17 @@ router.get('/health', async (req, res) => {
   res.json({ ok: true, database: 'connected', signal: 'green' });
 });
 
+// Debug endpoint — echoes received query params (useful for Vercel diagnostics)
+router.get('/debug/echo', async (req, res) => {
+  res.json({
+    query: req.query,
+    url: req.url,
+    originalUrl: req.originalUrl,
+    path: req.path,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Metrics
 router.get('/metrics', async (req, res) => {
   try {

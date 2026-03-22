@@ -7,6 +7,7 @@
  */
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://localhost:3010/api';
+const API_KEY = (import.meta.env.VITE_API_KEY as string) || 'dev_key_2026';
 
 function buildUrl(path: string, params?: Record<string, any>): string {
     const url = new URL(`${BASE}${path}`);
@@ -20,6 +21,14 @@ function buildUrl(path: string, params?: Record<string, any>): string {
     return url.toString();
 }
 
+/** Common headers sent with every request */
+function getHeaders(extra?: Record<string, string>): Record<string, string> {
+    return {
+        'x-api-key': API_KEY,
+        ...extra,
+    };
+}
+
 async function handleResponse(res: Response) {
     if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -30,7 +39,7 @@ async function handleResponse(res: Response) {
 
 /** GET request with optional query params */
 export const bGet = async (path: string, params?: Record<string, any>) => {
-    const res = await fetch(buildUrl(path, params));
+    const res = await fetch(buildUrl(path, params), { headers: getHeaders() });
     return handleResponse(res);
 };
 
@@ -38,7 +47,7 @@ export const bGet = async (path: string, params?: Record<string, any>) => {
 export const bPost = async (path: string, body?: any) => {
     const res = await fetch(buildUrl(path), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     return handleResponse(res);
@@ -48,7 +57,7 @@ export const bPost = async (path: string, body?: any) => {
 export const bPatch = async (path: string, body?: any) => {
     const res = await fetch(buildUrl(path), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     return handleResponse(res);

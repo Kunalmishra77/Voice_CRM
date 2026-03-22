@@ -43,11 +43,11 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
       },
 
       setDateRange: (range) => set({ dateRange: range, datePreset: 'custom', lastUpdated: Date.now() }),
-      
+
       setSearchQuery: (query) => set({ searchQuery: query, lastUpdated: Date.now() }),
-      
+
       setSelectedAgent: (agent) => set({ selectedAgent: agent, lastUpdated: Date.now() }),
-      
+
       setSelectedStage: (stage) => set({ selectedStage: stage, lastUpdated: Date.now() }),
 
       resetFilters: () => set({
@@ -61,6 +61,17 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
     }),
     {
       name: 'voice_crm_global_filters',
+      // Recompute date ranges from preset on rehydration to prevent stale cached dates
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        // For non-custom presets, always recompute the date range from the preset
+        // so "Weekly" always means THIS week, not the week from last session
+        if (state.datePreset !== 'custom') {
+          const freshRange = getRangeFromPreset(state.datePreset);
+          state.dateRange = freshRange;
+          state.lastUpdated = Date.now();
+        }
+      },
     }
   )
 );

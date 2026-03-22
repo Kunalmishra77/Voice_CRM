@@ -21,13 +21,31 @@ const CRM_CONVERTED = 'crm_converted';
 const CRM_LOST = 'crm_lost';
 const LOST_STATUSES = ['not interested', 'wrong number', 'busy', 'voicemail'];
 
+/** Validate a YYYY-MM-DD date string */
+function isValidDate(s: any): s is string {
+  if (typeof s !== 'string' || !s) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
+}
+
+/** Parse pagination values safely */
+function safeInt(v: any, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
 export const conversationService = {
   getConversations: async (filters: any) => {
-    const { page = 1, limit = 100, q, date_from, date_to } = filters;
+    const { q } = filters;
+    const page = safeInt(filters.page, 1);
+    const limit = safeInt(filters.limit, 500);
+    const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
+    const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
+    console.log('[conversations] filters:', { q, date_from, date_to, page, limit });
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
-    if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.summary}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
+    if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
     if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
     if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
@@ -47,10 +65,10 @@ export const conversationService = {
     };
   },
   getContacts: async (filters: any) => {
-    const { data, error } = await supabase.from(LEADS_TABLE).select(`"${COLS.leads.phone}","${COLS.leads.name}","${COLS.leads.status}","${COLS.leads.created_at}"`).order(COLS.leads.created_at, { ascending: false });
+    const { data, error } = await supabase.from(LEADS_TABLE).select(`${COLS.leads.phone}, ${COLS.leads.name}, ${COLS.leads.status}, ${COLS.leads.created_at}`).order(COLS.leads.created_at, { ascending: false });
     if (error) throw error;
     const uniqueMap = new Map();
-    (data || []).forEach(row => {
+    (data || []).forEach((row: any) => {
       const phone = row[COLS.leads.phone];
       if (!uniqueMap.has(phone)) {
         uniqueMap.set(phone, { phone, name: row[COLS.leads.name], lastStage: row[COLS.leads.status], lastSeen: row[COLS.leads.created_at] });
@@ -88,14 +106,18 @@ export const conversationService = {
 
 export const leadService = {
   getLeads: async (filters: any) => {
-    const { page = 1, limit = 100, stage, sentiment, q, date_from, date_to } = filters;
-    console.log('Fetching leads with filters:', { stage, sentiment, q, date_from, date_to });
-    
+    const { stage, sentiment, q } = filters;
+    const page = safeInt(filters.page, 1);
+    const limit = safeInt(filters.limit, 500);
+    const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
+    const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
+    console.log('[leads] filters:', { stage, sentiment, q, date_from, date_to, page, limit });
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
-    
-    if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
+
+    if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
     if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
     if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     
@@ -131,7 +153,8 @@ export const leadService = {
     }
     
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
-    if (error) throw error;
+    if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
+    console.log('[leads] returned', data?.length, 'rows, total:', count);
     return {
       data: (data || []).map(row => ({
         ...row,
@@ -144,7 +167,7 @@ export const leadService = {
         "Action to be taken": row[COLS.leads.comments],
         "Timestamp": row[COLS.leads.timestamp] || row[COLS.leads.created_at]
       })),
-      meta: { total: count || 0, page: Number(page), limit: Number(limit) }
+      meta: { total: count || 0, page, limit }
     };
   },
   updateStatus: async (params: any) => {
@@ -160,12 +183,17 @@ export const leadService = {
 
 export const dashboardService = {
   getStats: async (filters: any = {}) => {
-    const { date_from, date_to } = filters;
-    let query = supabase.from(LEADS_TABLE).select(`"${COLS.leads.status}", "${COLS.leads.sentiment}", "${COLS.leads.phone}"`, { count: 'exact' });
+    const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
+    const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
+    console.log('[metrics] filters:', { date_from, date_to });
+
+    let query = supabase.from(LEADS_TABLE).select(`${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}`, { count: 'exact' });
     if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
     if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
-    const { data, count } = await query;
-    
+    const { data, count, error } = await query;
+    if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
+    console.log('[metrics] returned', data?.length, 'rows, total:', count);
+
     const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, Average: 0 };
     let converted = 0;
     let lost = 0;

@@ -136,7 +136,7 @@ const ExportsPage: React.FC = () => {
                       key={f.value}
                       onClick={() => setSelectedFormat(f.value)}
                       className={cn(
-                        "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group",
+                        "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group cursor-pointer",
                         selectedFormat === f.value
                           ? "bg-primary/5 border-primary shadow-sm scale-[1.02]"
                           : "bg-card border-border text-muted-foreground hover:border-primary/30"

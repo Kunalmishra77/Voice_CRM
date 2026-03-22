@@ -35,9 +35,9 @@ const SettingsPage: React.FC = () => {
           <SectionCard title="Appearance" subtitle="Customize the interface." icon={<Sun size={18} className="text-primary" />}>
             <div className="grid grid-cols-2 gap-6 py-2">
                <button 
-                 onClick={() => setTheme('light')} 
+                 onClick={() => setTheme('light')}
                  className={cn(
-                   "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group relative overflow-hidden", 
+                   "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group relative overflow-hidden cursor-pointer",
                    theme === 'light' ? "bg-card border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]" : "bg-secondary/50 border-border/50 text-muted-foreground hover:bg-secondary hover:border-border"
                  )}
                >
@@ -49,9 +49,9 @@ const SettingsPage: React.FC = () => {
                </button>
 
                <button 
-                 onClick={() => setTheme('dark')} 
+                 onClick={() => setTheme('dark')}
                  className={cn(
-                   "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group relative overflow-hidden", 
+                   "flex flex-col items-center justify-center p-8 rounded-2xl border transition-all gap-4 group relative overflow-hidden cursor-pointer",
                    theme === 'dark' ? "bg-card border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]" : "bg-secondary/50 border-border/50 text-muted-foreground hover:bg-secondary hover:border-border"
                  )}
                >
@@ -94,7 +94,7 @@ const SettingsPage: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                      {['30', '90', '365', '∞'].map(d => (
-                       <button key={d} onClick={() => { setRetention(d); toast.success(`Retention set to ${d === '∞' ? 'unlimited' : d + ' days'}`); }} className={cn("py-3 rounded-xl text-[11px] font-bold transition-all border shadow-sm", retentionPeriod === d ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 text-muted-foreground hover:border-primary/40 hover:bg-accent")}>{d} Days</button>
+                       <button key={d} onClick={() => { setRetention(d); toast.success(`Retention set to ${d === '∞' ? 'unlimited' : d + ' days'}`); }} className={cn("py-3 rounded-xl text-[11px] font-bold transition-all border shadow-sm cursor-pointer", retentionPeriod === d ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 text-muted-foreground hover:border-primary/40 hover:bg-accent")}>{d} Days</button>
                      ))}
                   </div>
                </div>
