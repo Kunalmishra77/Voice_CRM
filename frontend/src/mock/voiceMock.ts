@@ -273,6 +273,7 @@ export const selectors = {
     const pendingDecisions = totalLeads - converted - unconverted;
 
     const avgScore = totalLeads > 0 ? Math.round(leads.reduce((acc, l) => acc + l.avg_score, 0) / totalLeads) : 0;
+    const avgLeads = Math.round(totalLeads / 7);
 
     return { totalLeads, hotLeads, warmLeads, coldLeads, avgLeads, converted, unconverted, pendingDecisions, avgScore };
   },
