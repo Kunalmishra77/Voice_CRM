@@ -1,4 +1,4 @@
-export type LeadBucket = 'Hot' | 'Warm' | 'Average' | 'Cold';
+export type LeadBucket = 'Hot' | 'Warm' | 'Cold';
 
 export interface ScoringResult {
   score: number;
@@ -7,9 +7,8 @@ export interface ScoringResult {
 }
 
 export const mapScoreToBucket = (score: number): LeadBucket => {
-  if (score >= 81) return 'Hot';
-  if (score >= 61) return 'Warm';
-  if (score >= 31) return 'Average';
+  if (score >= 70) return 'Hot';
+  if (score >= 40) return 'Warm';
   return 'Cold';
 };
 

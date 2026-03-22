@@ -58,11 +58,11 @@ const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undef
     <StatCard label="Total Leads" value={kpis?.totalLeads ?? 0} icon={Users} variant="teal" onClick={() => handleStatClick('all')} />
     <StatCard label="Hot" value={kpis?.hotLeads ?? 0} icon={Flame} variant="orange" onClick={() => handleStatClick('Hot')} />
     <StatCard label="Warm" value={kpis?.warmLeads ?? 0} icon={Zap} variant="purple" onClick={() => handleStatClick('Warm')} />
+    <StatCard label="Average" value={kpis?.avgLeads ?? 0} icon={Target} variant="teal" onClick={() => handleStatClick('Average')} />
     <StatCard label="Cold" value={kpis?.coldLeads ?? 0} icon={Activity} variant="blue" onClick={() => handleStatClick('Cold')} />
     <StatCard label="Converted" value={kpis?.converted ?? 0} icon={CheckCircle2} variant="teal" onClick={() => handleStatClick('Converted')} />
     <StatCard label="Lost" value={kpis?.unconverted ?? 0} icon={XCircle} variant="danger" onClick={() => handleStatClick('Lost')} />
     <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
-    <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" />
   </div>
 ));
 
@@ -91,7 +91,7 @@ const RecentActivityTable = React.memo(({ recentLeads, navigate }: { recentLeads
                 </div>
               </td>
               <td className="px-4 py-3.5">
-                <Badge variant={lead.sentiment === 'Hot' ? 'danger' : lead.sentiment === 'Warm' ? 'warning' : 'success'} className="font-medium text-xs">
+                <Badge variant={lead.sentiment === 'Hot' ? 'danger' : lead.sentiment === 'Warm' ? 'warning' : 'info'} className="font-medium text-xs">
                   {lead.sentiment}
                 </Badge>
               </td>
@@ -162,7 +162,7 @@ const DashboardPage: React.FC = () => {
   const handleStatClick = (bucket?: string) => {
     const params = new URLSearchParams();
     if (bucket) {
-      if (['Hot', 'Warm', 'Cold', 'Average'].includes(bucket)) params.set('bucket', bucket);
+      if (['Hot', 'Warm', 'Cold'].includes(bucket)) params.set('bucket', bucket);
       else params.set('status', bucket);
     }
     navigate(`/leads?${params.toString()}`);
@@ -259,10 +259,9 @@ const DashboardPage: React.FC = () => {
                     {[
                       { name: 'Hot', color: '#ef4444' },
                       { name: 'Warm', color: '#f59e0b' },
-                      { name: 'Cold', color: '#3b82f6' },
-                      { name: 'Average', color: '#10b981' }
+                      { name: 'Cold', color: '#3b82f6' }
                     ].map((item) => {
-                      const val = stageDistro?.find(s => s.name === (item.name === 'Average' ? 'null' : item.name))?.value || 0;
+                      const val = stageDistro?.find(s => s.name === item.name)?.value || 0;
                       return (
                         <div key={item.name} onClick={() => handleStatClick(item.name)} className="flex items-center justify-between p-3 rounded-xl bg-secondary border border-border hover:border-primary/20 cursor-pointer transition-all group">
                           <div className="flex items-center gap-2">

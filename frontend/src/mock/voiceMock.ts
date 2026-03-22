@@ -36,7 +36,7 @@ export type VoiceCall = {
   agent: { id: string; name: string } | null;
   stage: 'New' | 'InProgress' | 'FollowUpScheduled' | 'Converted' | 'NotInterested' | 'Closed';
   sentiment: 'Positive' | 'Neutral' | 'Negative';
-  lead_stage_bucket: 'Hot' | 'Warm' | 'Average' | 'Cold';
+  lead_stage_bucket: 'Hot' | 'Warm' | 'Cold';
   lead_score: number;
   concern: string;
   outcome: 'Converted' | 'Unconverted' | 'Pending';
@@ -73,7 +73,7 @@ export type LeadProfile = {
   owner: { id: string; name: string } | null;
   worked_flag: boolean;
   sentiment: 'Positive' | 'Neutral' | 'Negative';
-  bucket: 'Hot' | 'Warm' | 'Average' | 'Cold';
+  bucket: 'Hot' | 'Warm' | 'Cold';
   concern: string;
   action_to_take: string;
   summary: string;
@@ -120,10 +120,9 @@ for (let i = 0; i < 200; i++) {
   const customer_name = `${rng.pick(firstNames)} ${rng.pick(lastNames)}`;
   
   const score = rng.int(10, 98);
-  let bucket: 'Hot' | 'Warm' | 'Average' | 'Cold' = 'Average';
-  if (score > 80) bucket = 'Hot';
-  else if (score > 60) bucket = 'Warm';
-  else if (score < 30) bucket = 'Cold';
+  let bucket: 'Hot' | 'Warm' | 'Cold' = 'Warm';
+  if (score > 70) bucket = 'Hot';
+  else if (score < 40) bucket = 'Cold';
 
   const status = (isActive ? 'active' : rng.pick(['ended', 'ended', 'ended', 'missed', 'failed'])) as 'active' | 'ended' | 'missed' | 'failed';
   const agent = rng.boolean(0.8) ? rng.pick(agents) : null;
@@ -269,8 +268,6 @@ export const selectors = {
     const hotLeads = leads.filter(l => l.bucket === 'Hot').length;
     const warmLeads = leads.filter(l => l.bucket === 'Warm').length;
     const coldLeads = leads.filter(l => l.bucket === 'Cold').length;
-    const avgLeads = leads.filter(l => l.bucket === 'Average').length;
-    
     const converted = leads.filter(l => l.status === 'Converted').length;
     const unconverted = leads.filter(l => l.status === 'NotInterested' || l.status === 'Closed').length;
     const pendingDecisions = totalLeads - converted - unconverted;
@@ -298,13 +295,13 @@ export const selectors = {
 
   computeStageSplit: (leads: LeadProfile[]) => {
     const total = leads.length || 1;
-    const buckets = ['Hot', 'Warm', 'Average', 'Cold'] as const;
+    const buckets = ['Hot', 'Warm', 'Cold'] as const;
     return buckets.map(b => {
       const count = leads.filter(l => l.bucket === b).length;
       return {
         name: b,
         value: Math.round((count / total) * 100),
-        color: b === 'Hot' ? '#f43f5e' : b === 'Warm' ? '#f59e0b' : b === 'Average' ? '#10b981' : '#0ea5e9'
+        color: b === 'Hot' ? '#f43f5e' : b === 'Warm' ? '#f59e0b' : '#0ea5e9'
       };
     });
   },

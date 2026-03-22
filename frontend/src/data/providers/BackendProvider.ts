@@ -56,7 +56,7 @@ export class BackendProvider implements IDataProvider {
         created_at: l.Timestamp,
         scoring: { 
             score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : 34, 
-            bucket: l.sentiment || 'Average', 
+            bucket: (l.sentiment === 'Average' || !l.sentiment) ? 'Warm' : l.sentiment, 
             reasons: [] 
         }
     }));
@@ -92,16 +92,23 @@ export class BackendProvider implements IDataProvider {
 
   async getStageDistribution(range: DateRange, bucket?: string): Promise<StagePoint[]> {
     const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
-    const colors: Record<string, string> = { 'Hot': '#ef4444', 'Warm': '#f59e0b', 'Cold': '#3b82f6', 'null': '#10b981', 'Average': '#10b981' };
+    const colors: Record<string, string> = { 
+      'Hot': '#ef4444', 
+      'Warm': '#f59e0b', 
+      'Cold': '#3b82f6', 
+      'Average': '#10b981',
+      'Converted': '#06b6d4',
+      'Lost': '#64748b'
+    };
     const distData = stats.stage_counts || {};
     const total = Object.values(distData).reduce((a: any, b: any) => a + b, 0) as number || 1;
-    
+
     return Object.entries(distData)
       .map(([name, value]) => ({
-        name: name === 'null' ? 'Average' : name,
+        name,
         value: Math.round(((value as number) / total) * 100),
-        color: colors[name] || '#64748b'
-    }));
+        color: colors[name] || '#cbd5e1'
+    })).filter(item => item.value > 0);
   }
 
   async getTopFollowUps(range: DateRange, bucket?: string): Promise<FollowUpLead[]> {
@@ -113,7 +120,7 @@ export class BackendProvider implements IDataProvider {
         time: safeFormat(l.Timestamp, 'hh:mm a'),
         status: l.sentiment || 'New',
         score: l.sentiment === 'Hot' ? 95 : 70,
-        scoring: { score: 90, bucket: l.sentiment || 'Average', reasons: [] },
+        scoring: { score: 90, bucket: (l.sentiment === 'Average' || !l.sentiment) ? 'Warm' : l.sentiment, reasons: [] },
         missingCount: 0
     }));
   }
@@ -217,7 +224,7 @@ export class BackendProvider implements IDataProvider {
         id: res.leadid?.toString() || '0',
         scoring: { 
             score: res.sentiment === 'Hot' ? 95 : res.sentiment === 'Warm' ? 70 : 40, 
-            bucket: res.sentiment || 'Average', 
+            bucket: (res.sentiment === 'Average' || !res.sentiment) ? 'Warm' : res.sentiment, 
             reasons: [] 
         }
     };

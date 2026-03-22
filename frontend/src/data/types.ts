@@ -15,7 +15,7 @@ export interface KPIStats {
 
 export interface ScoringResult {
   score: number;
-  bucket: 'Hot' | 'Warm' | 'Average' | 'Cold';
+  bucket: 'Hot' | 'Warm' | 'Cold';
   reasons: string[];
 }
 

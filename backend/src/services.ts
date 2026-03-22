@@ -96,7 +96,7 @@ export const conversationService = {
           "User Name": data[COLS.leads.name],
           "concern": data[COLS.leads.summary],
           "lead stage": data[COLS.leads.status],
-          "sentiment": data[COLS.leads.sentiment] || 'Average',
+          "sentiment": (data[COLS.leads.sentiment] === 'Average' || !data[COLS.leads.sentiment]) ? 'Warm' : data[COLS.leads.sentiment],
           "Conversation Summary": data[COLS.leads.summary],
           "Action to be taken": data[COLS.leads.comments]
       }
@@ -132,12 +132,13 @@ export const leadService = {
       } else if (stage === 'Pending') {
         const finalized = [CRM_CONVERTED, CRM_LOST, ...LOST_STATUSES];
         query = query.not(COLS.leads.status, 'in', `(${finalized.join(',')})`);
-      } else if (['Hot', 'Warm', 'Cold', 'Average'].includes(stage)) {
+      } else if (['Hot', 'Warm', 'Cold'].includes(stage)) {
         // Sentiment-based filtering for non-finalized leads
         const finalized = [CRM_CONVERTED, CRM_LOST, ...LOST_STATUSES];
         query = query.not(COLS.leads.status, 'in', `(${finalized.join(',')})`);
-        if (stage === 'Average') {
-          query = query.or(`sentiment.is.null,sentiment.eq.Average`);
+        if (stage === 'Warm') {
+          // Warm includes null/Average sentiment
+          query = query.or(`sentiment.is.null,sentiment.eq.Average,sentiment.eq.Warm,sentiment.eq.warm`);
         } else {
           query = query.eq(COLS.leads.sentiment, stage);
         }
@@ -145,8 +146,8 @@ export const leadService = {
     }
     
     if (sentiment && sentiment !== 'all') {
-      if (sentiment === 'Average') {
-        query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average`);
+      if (sentiment === 'Warm') {
+        query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average,${COLS.leads.sentiment}.eq.Warm,${COLS.leads.sentiment}.eq.warm`);
       } else {
         query = query.eq(COLS.leads.sentiment, sentiment);
       }
@@ -162,7 +163,7 @@ export const leadService = {
         "User Name": row[COLS.leads.name],
         "concern": row[COLS.leads.summary],
         "lead stage": row[COLS.leads.status],
-        "sentiment": row[COLS.leads.sentiment] || 'Average',
+        "sentiment": (row[COLS.leads.sentiment] === 'Average' || !row[COLS.leads.sentiment]) ? 'Warm' : row[COLS.leads.sentiment],
         "Conversation Summary": row[COLS.leads.summary],
         "Action to be taken": row[COLS.leads.comments],
         "Timestamp": row[COLS.leads.timestamp] || row[COLS.leads.created_at]
@@ -194,9 +195,7 @@ export const dashboardService = {
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
     console.log('[metrics] returned', data?.length, 'rows, total:', count);
 
-    const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, Average: 0 };
-    let converted = 0;
-    let lost = 0;
+    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Average: 0, Converted: 0, Lost: 0 };
     const phones = new Set();
     
     (data || []).forEach((row: any) => {
@@ -204,12 +203,16 @@ export const dashboardService = {
         const sent = row[COLS.leads.sentiment] || 'Average';
         
         if (s === CRM_CONVERTED) {
-          converted++;
+          stage_counts.Converted++;
         } else if (s === CRM_LOST || LOST_STATUSES.includes(s)) {
-          lost++;
+          stage_counts.Lost++;
         } else {
           // It's a pending/active lead, count its sentiment
-          sentiment_counts[sent] = (sentiment_counts[sent] || 0) + 1;
+          if (stage_counts[sent] !== undefined) {
+            stage_counts[sent]++;
+          } else {
+            stage_counts.Average++;
+          }
         }
         
         if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
@@ -217,18 +220,18 @@ export const dashboardService = {
 
     const bucket_counts = {
       all: count || 0,
-      Hot: sentiment_counts['Hot'] || 0,
-      Warm: sentiment_counts['Warm'] || 0,
-      Cold: sentiment_counts['Cold'] || 0,
-      Average: sentiment_counts['Average'] || 0,
-      Converted: converted,
-      Lost: lost,
-      Pending: (count || 0) - converted - lost
+      Hot: stage_counts.Hot,
+      Warm: stage_counts.Warm,
+      Cold: stage_counts.Cold,
+      Average: stage_counts.Average,
+      Converted: stage_counts.Converted,
+      Lost: stage_counts.Lost,
+      Pending: (count || 0) - stage_counts.Converted - stage_counts.Lost
     };
     return {
       total_leads: count || 0,
       unique_phones: phones.size,
-      stage_counts: sentiment_counts, 
+      stage_counts, 
       bucket_counts
     };
   }
@@ -249,7 +252,7 @@ export const proxyService = {
         "User Name": data[COLS.leads.name],
         "concern": data[COLS.leads.summary],
         "lead stage": data[COLS.leads.status],
-        "sentiment": data[COLS.leads.sentiment] || 'Average',
+        "sentiment": (data[COLS.leads.sentiment] === 'Average' || !data[COLS.leads.sentiment]) ? 'Warm' : data[COLS.leads.sentiment],
         "Conversation Summary": data[COLS.leads.summary],
         "Action to be taken": data[COLS.leads.comments]
     };

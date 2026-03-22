@@ -66,7 +66,6 @@ const BUCKET_OPTIONS = [
   { value: 'all', label: 'All', color: 'zinc' },
   { value: 'Hot', label: 'Hot', color: 'danger' },
   { value: 'Warm', label: 'Warm', color: 'warning' },
-  { value: 'Average', label: 'Average', color: 'success' },
   { value: 'Cold', label: 'Cold', color: 'info' },
   { value: 'Converted', label: 'Converted', color: 'success' },
   { value: 'Lost', label: 'Lost', color: 'danger' },
