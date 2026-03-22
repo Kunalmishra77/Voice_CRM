@@ -33,6 +33,40 @@ function safeInt(v: any, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+/** Normalize raw sentiment from DB to consistent capitalized form */
+function normalizeSentiment(raw: any): string {
+  if (!raw) return 'Warm';
+  const lower = String(raw).toLowerCase().trim();
+  if (lower === 'hot') return 'Hot';
+  if (lower === 'cold') return 'Cold';
+  if (lower === 'warm' || lower === 'average') return 'Warm';
+  return 'Warm'; // fallback for unknown values
+}
+
+/** Parse custom call_date_time format: "2:00 pmThursday, 12 March 2026" */
+function parseCallDateTime(s: string): string | null {
+  if (!s || typeof s !== 'string') return null;
+  try {
+    // Extract date part: "12 March 2026"
+    const dateMatch = s.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+    // Extract time part: "2:00 pm"
+    const timeMatch = s.match(/(\d{1,2}:\d{2}\s+[ap]m)/i);
+    
+    if (dateMatch && timeMatch) {
+      const dateStr = `${dateMatch[1]} ${timeMatch[1]}`;
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    
+    // Fallback: try parsing the whole string after removing the day name
+    const cleaned = s.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/gi, '');
+    const d2 = new Date(cleaned);
+    return isNaN(d2.getTime()) ? null : d2.toISOString();
+  } catch (e) {
+    return null;
+  }
+}
+
 export const conversationService = {
   getConversations: async (filters: any) => {
     const { q } = filters;
@@ -51,16 +85,20 @@ export const conversationService = {
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
     if (error) throw error;
     return {
-      data: (data || []).map(row => ({
-        ...row,
-        "Phone Number": row[COLS.leads.phone],
-        "User Name": row[COLS.leads.name],
-        "Timestamp": row[COLS.leads.timestamp] || row[COLS.leads.created_at],
-        "Session ID": row[COLS.leads.id].toString(),
-        "User Message": row[COLS.leads.summary] || 'No summary',
-        "Bot Response": 'Voice Intercept',
-        "Conversation Stage": row[COLS.leads.status]
-      })),
+      data: (data || []).map(row => {
+        const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) || row[COLS.leads.created_at];
+        return {
+          ...row,
+          "Phone Number": row[COLS.leads.phone],
+          "User Name": row[COLS.leads.name],
+          "Timestamp": row[COLS.leads.timestamp],
+          "CallTimestamp": callTimestamp,
+          "Session ID": row[COLS.leads.id].toString(),
+          "User Message": row[COLS.leads.summary] || 'No summary',
+          "Bot Response": 'Voice Intercept',
+          "Conversation Stage": row[COLS.leads.status]
+        };
+      }),
       meta: { total: count || 0, page: Number(page), limit: Number(limit) }
     };
   },
@@ -96,7 +134,7 @@ export const conversationService = {
           "User Name": data[COLS.leads.name],
           "concern": data[COLS.leads.summary],
           "lead stage": data[COLS.leads.status],
-          "sentiment": (data[COLS.leads.sentiment] === 'Average' || !data[COLS.leads.sentiment]) ? 'Warm' : data[COLS.leads.sentiment],
+          "sentiment": normalizeSentiment(data[COLS.leads.sentiment]),
           "Conversation Summary": data[COLS.leads.summary],
           "Action to be taken": data[COLS.leads.comments]
       }
@@ -137,19 +175,24 @@ export const leadService = {
         const finalized = [CRM_CONVERTED, CRM_LOST, ...LOST_STATUSES];
         query = query.not(COLS.leads.status, 'in', `(${finalized.join(',')})`);
         if (stage === 'Warm') {
-          // Warm includes null/Average sentiment
-          query = query.or(`sentiment.is.null,sentiment.eq.Average,sentiment.eq.Warm,sentiment.eq.warm`);
-        } else {
-          query = query.eq(COLS.leads.sentiment, stage);
+          // Warm includes null/Average/warm and any other non-Hot, non-Cold sentiment (typos like "worm", etc.)
+          // Use NOT Hot AND NOT Cold to match normalizeSentiment() logic
+          query = query.not(COLS.leads.sentiment, 'in', `(Hot,hot,Cold,cold)`);
+        } else if (stage === 'Hot') {
+          query = query.or(`sentiment.eq.Hot,sentiment.eq.hot`);
+        } else if (stage === 'Cold') {
+          query = query.or(`sentiment.eq.Cold,sentiment.eq.cold`);
         }
       }
     }
     
     if (sentiment && sentiment !== 'all') {
       if (sentiment === 'Warm') {
-        query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average,${COLS.leads.sentiment}.eq.Warm,${COLS.leads.sentiment}.eq.warm`);
+        // Match anything that's NOT Hot and NOT Cold (same as normalizeSentiment logic)
+        query = query.not(COLS.leads.sentiment, 'in', `(Hot,hot,Cold,cold)`);
       } else {
-        query = query.eq(COLS.leads.sentiment, sentiment);
+        // Case-insensitive: match both 'Hot'/'hot', 'Cold'/'cold'
+        query = query.or(`${COLS.leads.sentiment}.eq.${sentiment},${COLS.leads.sentiment}.eq.${sentiment.toLowerCase()}`);
       }
     }
     
@@ -157,17 +200,22 @@ export const leadService = {
     if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
     console.log('[leads] returned', data?.length, 'rows, total:', count);
     return {
-      data: (data || []).map(row => ({
-        ...row,
-        "Phone Number": row[COLS.leads.phone],
-        "User Name": row[COLS.leads.name],
-        "concern": row[COLS.leads.summary],
-        "lead stage": row[COLS.leads.status],
-        "sentiment": (row[COLS.leads.sentiment] === 'Average' || !row[COLS.leads.sentiment]) ? 'Warm' : row[COLS.leads.sentiment],
-        "Conversation Summary": row[COLS.leads.summary],
-        "Action to be taken": row[COLS.leads.comments],
-        "Timestamp": row[COLS.leads.timestamp] || row[COLS.leads.created_at]
-      })),
+      data: (data || []).map(row => {
+        const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) || row[COLS.leads.created_at];
+        return {
+          ...row,
+          "Phone Number": row[COLS.leads.phone],
+          "User Name": row[COLS.leads.name],
+          "concern": row[COLS.leads.summary],
+          "lead stage": row[COLS.leads.status],
+          "sentiment": normalizeSentiment(row[COLS.leads.sentiment]),
+          "Conversation Summary": row[COLS.leads.summary],
+          "Action to be taken": row[COLS.leads.comments],
+          "Timestamp": row[COLS.leads.timestamp],
+          "CallTimestamp": callTimestamp,
+          "created_at": row[COLS.leads.created_at] // Keep original DB timestamp for date grouping
+        };
+      }),
       meta: { total: count || 0, page, limit }
     };
   },
@@ -200,22 +248,15 @@ export const dashboardService = {
     
     (data || []).forEach((row: any) => {
         const s = (row[COLS.leads.status] || '').toLowerCase();
-        const sent = row[COLS.leads.sentiment] || 'Average';
-        
+        const sent = normalizeSentiment(row[COLS.leads.sentiment]);
+
         if (s === CRM_CONVERTED) {
           stage_counts.Converted++;
         } else if (s === CRM_LOST || LOST_STATUSES.includes(s)) {
           stage_counts.Lost++;
         } else {
-          // It's a pending/active lead, count its sentiment
-          if (sent === 'Hot') {
-            stage_counts.Hot++;
-          } else if (sent === 'Cold') {
-            stage_counts.Cold++;
-          } else {
-            // Everything else (Warm, Average, null) goes to Warm
-            stage_counts.Warm++;
-          }
+          // It's a pending/active lead, count its normalized sentiment
+          stage_counts[sent] = (stage_counts[sent] || 0) + 1;
         }
         
         if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
@@ -254,7 +295,7 @@ export const proxyService = {
         "User Name": data[COLS.leads.name],
         "concern": data[COLS.leads.summary],
         "lead stage": data[COLS.leads.status],
-        "sentiment": (data[COLS.leads.sentiment] === 'Average' || !data[COLS.leads.sentiment]) ? 'Warm' : data[COLS.leads.sentiment],
+        "sentiment": normalizeSentiment(data[COLS.leads.sentiment]),
         "Conversation Summary": data[COLS.leads.summary],
         "Action to be taken": data[COLS.leads.comments]
     };

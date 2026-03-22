@@ -24,6 +24,33 @@ import type {
   UpdateLeadStatusResult
 } from '../types';
 
+/** Robust date parser for trend grouping */
+function parseAnyDate(dateStr: any): Date {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  
+  try {
+    // 1. Try standard ISO
+    const d = parseISO(dateStr);
+    if (!isNaN(d.getTime())) return d;
+    
+    // 2. Try parsing custom format "2:00 pmThursday, 12 March 2026"
+    if (typeof dateStr === 'string') {
+      const dateMatch = dateStr.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+      if (dateMatch) {
+        const d2 = new Date(dateMatch[1]);
+        if (!isNaN(d2.getTime())) return d2;
+      }
+    }
+    
+    // 3. Fallback
+    const d3 = new Date(dateStr);
+    return isNaN(d3.getTime()) ? new Date() : d3;
+  } catch (e) {
+    return new Date();
+  }
+}
+
 export class BackendProvider implements IDataProvider {
   async getDashboardKPIs(range: DateRange): Promise<KPIStats> {
     const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
@@ -53,11 +80,18 @@ export class BackendProvider implements IDataProvider {
     return res.data.map((l: any) => ({
         ...l,
         id: l.leadid.toString(),
-        created_at: l.Timestamp,
-        scoring: { 
-            score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : 34, 
-            bucket: (l.sentiment === 'Average' || !l.sentiment) ? 'Warm' : l.sentiment, 
-            reasons: [] 
+        // Use backend CallTimestamp if available, otherwise parse call_date_time on frontend
+        CallTimestamp: l.CallTimestamp || (() => {
+          if (l.call_date_time) {
+            const parsed = parseAnyDate(l.call_date_time);
+            return parsed.toISOString();
+          }
+          return l.created_at;
+        })(),
+        scoring: {
+            score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : 34,
+            bucket: l.sentiment,
+            reasons: []
         }
     }));
   }
@@ -75,14 +109,49 @@ export class BackendProvider implements IDataProvider {
       startDate = subDays(endDate, 89);
     }
 
-    const interval = eachDayOfInterval({ start: startDate, end: endDate });
+    const FINALIZED = ['crm_converted', 'crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
+    const isLostBucket = bucket === 'Lost';
+    const isConvertedBucket = bucket === 'Converted';
+
+    // Use CallTimestamp (actual call date) for grouping, fallback to created_at
+    // Also expand the interval to cover actual call dates that may be outside the DB insertion range
+    let effectiveStart = startDate;
+    let effectiveEnd = endDate;
+    leads.forEach(l => {
+      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+      if (d < effectiveStart) effectiveStart = d;
+      if (d > effectiveEnd) effectiveEnd = d;
+    });
+
+    const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
     return interval.map(day => {
-      const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
+      const dayLeads = leads.filter(l => {
+        const leadDate = parseAnyDate(l.CallTimestamp || l.created_at);
+        return isSameDay(leadDate, day);
+      });
+
+      // For Lost/Converted buckets: all returned leads ARE lost/converted,
+      // so show their sentiment breakdown in hot/warm/cold bars
+      if (isLostBucket || isConvertedBucket) {
+        return {
+          name: safeFormat(day, 'MMM dd'),
+          hot: dayLeads.filter(l => (l.sentiment || '').toLowerCase() === 'hot').length,
+          warm: dayLeads.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average' || !s; }).length,
+          cold: dayLeads.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
+          converted: 0,
+          lost: 0,
+          from: safeFormat(day, 'yyyy-MM-dd'),
+          to: safeFormat(day, 'yyyy-MM-dd')
+        };
+      }
+
+      // For other buckets: separate finalized vs pending to avoid double-counting
+      const pending = dayLeads.filter(l => !FINALIZED.includes((l.status as any) || ''));
       return {
         name: safeFormat(day, 'MMM dd'),
-        hot: dayLeads.filter(l => l.sentiment === 'Hot').length,
-        warm: dayLeads.filter(l => l.sentiment === 'Warm' || l.sentiment === 'Average' || !l.sentiment).length,
-        cold: dayLeads.filter(l => l.sentiment === 'Cold').length,
+        hot: pending.filter(l => (l.sentiment || '').toLowerCase() === 'hot').length,
+        warm: pending.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average' || !s; }).length,
+        cold: pending.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
         converted: dayLeads.filter(l => (l.status as any) === 'crm_converted').length,
         lost: dayLeads.filter(l => ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes((l.status as any))).length,
         from: safeFormat(day, 'yyyy-MM-dd'),
@@ -93,23 +162,25 @@ export class BackendProvider implements IDataProvider {
 
   async getStageDistribution(range: DateRange, bucket?: string): Promise<StagePoint[]> {
     const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
-    const colors: Record<string, string> = { 
-      'Hot': '#ef4444', 
-      'Warm': '#f59e0b', 
-      'Cold': '#3b82f6', 
+    const colors: Record<string, string> = {
+      'Hot': '#ef4444',
+      'Warm': '#f59e0b',
+      'Cold': '#3b82f6',
       'Converted': '#06b6d4',
       'Lost': '#64748b'
     };
-    const distData = stats.stage_counts || {};
-    const total = Object.values(distData).reduce((a: any, b: any) => a + b, 0) as number || 1;
+    // Use bucket_counts which properly categorizes all leads
+    const bc = stats.bucket_counts || {};
+    const total = bc.all || Object.values(stats.stage_counts || {}).reduce((a: any, b: any) => a + b, 0) as number || 1;
+    const categories = ['Hot', 'Warm', 'Cold', 'Converted', 'Lost'];
 
-    return Object.entries(distData)
-      .filter(([name]) => name !== 'Average')
-      .map(([name, value]) => ({
+    return categories
+      .map(name => ({
         name,
-        value: Math.round(((value as number) / total) * 100),
+        value: Math.round(((bc[name] || 0) / total) * 100),
         color: colors[name] || '#cbd5e1'
-    })).filter(item => item.value > 0);
+      }))
+      .filter(item => item.value > 0);
   }
 
   async getTopFollowUps(range: DateRange, bucket?: string): Promise<FollowUpLead[]> {
@@ -121,7 +192,7 @@ export class BackendProvider implements IDataProvider {
         time: safeFormat(l.Timestamp, 'hh:mm a'),
         status: l.sentiment || 'New',
         score: l.sentiment === 'Hot' ? 95 : 70,
-        scoring: { score: 90, bucket: (l.sentiment === 'Average' || !l.sentiment) ? 'Warm' : l.sentiment, reasons: [] },
+        scoring: { score: 90, bucket: l.sentiment || 'Warm', reasons: [] },
         missingCount: 0
     }));
   }
@@ -179,9 +250,21 @@ export class BackendProvider implements IDataProvider {
       startDate = subDays(endDate, 89);
     }
 
-    const interval = eachDayOfInterval({ start: startDate, end: endDate });
+    // Expand interval to cover actual call dates
+    let effectiveStart = startDate;
+    let effectiveEnd = endDate;
+    leads.forEach(l => {
+      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+      if (d < effectiveStart) effectiveStart = d;
+      if (d > effectiveEnd) effectiveEnd = d;
+    });
+
+    const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
     return interval.map(day => {
-        const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
+        const dayLeads = leads.filter(l => {
+          const leadDate = parseAnyDate(l.CallTimestamp || l.created_at);
+          return isSameDay(leadDate, day);
+        });
         return {
           name: safeFormat(day, 'MMM dd'),
           messages: dayLeads.length,
@@ -223,10 +306,10 @@ export class BackendProvider implements IDataProvider {
     return {
         ...res,
         id: res.leadid?.toString() || '0',
-        scoring: { 
-            score: res.sentiment === 'Hot' ? 95 : res.sentiment === 'Warm' ? 70 : 40, 
-            bucket: (res.sentiment === 'Average' || !res.sentiment) ? 'Warm' : res.sentiment, 
-            reasons: [] 
+        scoring: {
+            score: res.sentiment === 'Hot' ? 95 : res.sentiment === 'Warm' ? 70 : 40,
+            bucket: res.sentiment || 'Warm',
+            reasons: []
         }
     };
   }
@@ -241,9 +324,16 @@ export class BackendProvider implements IDataProvider {
         }
     });
     const topConcerns = Object.entries(concernMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
-    const interval = eachDayOfInterval({ start: safeParseISO(range.from), end: safeParseISO(range.to) });
+    let sStart = safeParseISO(range.from);
+    let sEnd = safeParseISO(range.to);
+    leads.forEach(l => {
+      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+      if (d < sStart) sStart = d;
+      if (d > sEnd) sEnd = d;
+    });
+    const interval = eachDayOfInterval({ start: sStart, end: sEnd });
     const sentimentTrend = interval.map(day => {
-        const dayLeads = leads.filter(l => isSameDay(safeParseISO(l.created_at), day));
+        const dayLeads = leads.filter(l => isSameDay(parseAnyDate(l.CallTimestamp || l.created_at), day));
         return {
             name: safeFormat(day, 'MMM dd'),
             pos: dayLeads.filter(l => l.sentiment === 'Hot').length,

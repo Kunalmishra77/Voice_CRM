@@ -33,6 +33,8 @@ export interface LeadInsightRow {
   status?: 'Converted' | 'Unconverted' | 'Pending' | 'InProgress' | 'FollowUpScheduled';
   worked?: boolean;
   owner?: string;
+  CallTimestamp?: string;
+  duration?: string | number;
 }
 
 export interface TrendPoint {
