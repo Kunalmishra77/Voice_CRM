@@ -89,26 +89,43 @@ export const conversationService = {
 export const leadService = {
   getLeads: async (filters: any) => {
     const { page = 1, limit = 100, stage, sentiment, q, date_from, date_to } = filters;
+    console.log('Fetching leads with filters:', { stage, sentiment, q, date_from, date_to });
+    
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
+    
     if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
     if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
     if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    
+    // Improved Stage Filtering
     if (stage && stage !== 'all') {
-      if (stage === 'Converted') query = query.eq(COLS.leads.status, CRM_CONVERTED);
-      else if (stage === 'Lost') query = query.eq(COLS.leads.status, CRM_LOST);
-      else if (stage === 'Pending') query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
-      else if (['Hot', 'Warm', 'Cold', 'Average'].includes(stage)) {
-          query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
-          if (stage === 'Average') query = query.is(COLS.leads.sentiment, null);
-          else query = query.eq(COLS.leads.sentiment, stage);
+      if (stage === 'Converted') {
+        query = query.eq(COLS.leads.status, CRM_CONVERTED);
+      } else if (stage === 'Lost') {
+        query = query.eq(COLS.leads.status, CRM_LOST);
+      } else if (stage === 'Pending') {
+        query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
+      } else if (['Hot', 'Warm', 'Cold', 'Average'].includes(stage)) {
+        // These are sentiment buckets, usually only for non-finalized leads
+        query = query.not(COLS.leads.status, 'in', `(${CRM_CONVERTED},${CRM_LOST})`);
+        if (stage === 'Average') {
+          query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average`);
+        } else {
+          query = query.eq(COLS.leads.sentiment, stage);
+        }
       }
     }
+    
     if (sentiment && sentiment !== 'all') {
-      if (sentiment === 'Average') query = query.is(COLS.leads.sentiment, null);
-      else query = query.eq(COLS.leads.sentiment, sentiment);
+      if (sentiment === 'Average') {
+        query = query.or(`${COLS.leads.sentiment}.is.null,${COLS.leads.sentiment}.eq.Average`);
+      } else {
+        query = query.eq(COLS.leads.sentiment, sentiment);
+      }
     }
+    
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
     if (error) throw error;
     return {

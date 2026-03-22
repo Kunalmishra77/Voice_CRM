@@ -42,9 +42,10 @@ export class BackendProvider implements IDataProvider {
   }
 
   async getLeads(params: FetchLeadsParams): Promise<LeadInsightRow[]> {
+    const stage = params.bucket && params.bucket !== 'all' ? params.bucket : params.status;
     const res = await bGet('/leads', {
         q: params.search,
-        stage: params.bucket !== 'all' ? params.bucket : params.status,
+        stage: stage,
         sentiment: params.sentiment === 'all' ? undefined : params.sentiment,
         date_from: params.range?.from,
         date_to: params.range?.to
