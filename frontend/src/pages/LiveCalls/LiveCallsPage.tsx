@@ -31,7 +31,7 @@ interface LiveSession extends ChatSession {
 
 const LiveCallsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { dateRange, searchQuery, selectedAgent, selectedStage } = useGlobalFilters();
+  const { dateRange, searchQuery, selectedAgent, selectedStage, lastUpdated } = useGlobalFilters();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
@@ -44,14 +44,16 @@ const LiveCallsPage: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: initialSessions, isLoading } = useQuery({
-    queryKey: ['live-sessions-base', dateRange],
+    queryKey: ['live-sessions-base', dateRange, lastUpdated],
     queryFn: () => dataProvider.getSessions(dateRange),
+    staleTime: 30000
   });
 
   const { data: fullTranscript } = useQuery({
-    queryKey: ['live-transcript', selectedId],
+    queryKey: ['live-transcript', selectedId, lastUpdated],
     queryFn: () => dataProvider.getConversation(selectedId!),
     enabled: !!selectedId,
+    staleTime: 10000
   });
 
   // Filtered sessions based on global filters

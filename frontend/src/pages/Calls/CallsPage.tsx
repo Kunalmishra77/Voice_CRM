@@ -27,7 +27,7 @@ const CallsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const { dateRange, searchQuery: globalSearch } = useGlobalFilters();
+  const { dateRange, searchQuery: globalSearch, lastUpdated } = useGlobalFilters();
   const { outcomes, setOutcome } = useOutcomeStore();
 
   // --- UI State ---
@@ -50,14 +50,16 @@ const CallsPage: React.FC = () => {
 
   // --- Queries ---
   const { data: calls, isLoading: callsLoading } = useQuery({
-    queryKey: ['calls-list', dateRange],
+    queryKey: ['calls-list', dateRange, lastUpdated],
     queryFn: () => dataProvider.getSessions(dateRange),
+    staleTime: 30000
   });
 
   const { data: transcript, isLoading: transcriptLoading } = useQuery({
-    queryKey: ['transcript', selectedCallId],
+    queryKey: ['transcript', selectedCallId, lastUpdated],
     queryFn: () => dataProvider.getConversation(selectedCallId!),
     enabled: !!selectedCallId,
+    staleTime: 60000
   });
 
   const selectedCall = useMemo(() => {

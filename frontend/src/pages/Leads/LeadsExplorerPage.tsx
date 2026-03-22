@@ -76,7 +76,7 @@ const BUCKET_OPTIONS = [
 const LeadsExplorerPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dateRange, searchQuery, selectedAgent, selectedStage } = useGlobalFilters();
+  const { dateRange, searchQuery, selectedAgent, selectedStage, lastUpdated } = useGlobalFilters();
   const range = dateRange;
   const queryParams = new URLSearchParams(location.search);
 
@@ -103,7 +103,7 @@ const LeadsExplorerPage: React.FC = () => {
   });
 
   const { data: leads, isLoading: leadsLoading } = useQuery({
-    queryKey: ['leads-table', dateRange, bucket, localSearch, selectedAgent, selectedStage],
+    queryKey: ['leads-table', dateRange, bucket, localSearch, selectedAgent, selectedStage, lastUpdated],
     queryFn: () => dataProvider.getLeads({ 
       range, 
       bucket, 
@@ -111,21 +111,25 @@ const LeadsExplorerPage: React.FC = () => {
       agent: selectedAgent,
       stage: selectedStage
     }),
+    staleTime: 30000
   });
 
   const { data: kpis } = useQuery({
-    queryKey: ['dashboard-kpis', range],
+    queryKey: ['dashboard-kpis', range, lastUpdated],
     queryFn: () => dataProvider.getDashboardKPIs(range),
+    staleTime: 30000
   });
 
   const { data: trendData } = useQuery({
-    queryKey: ['leads-trend', dateRange, bucket],
+    queryKey: ['leads-trend', dateRange, bucket, lastUpdated],
     queryFn: () => dataProvider.getLeadsTrend(range, 'weekly', bucket),
+    staleTime: 30000
   });
 
   const { data: stageDistro } = useQuery({
-    queryKey: ['leads-stage', dateRange, bucket],
+    queryKey: ['leads-stage', dateRange, bucket, lastUpdated],
     queryFn: () => dataProvider.getStageDistribution(range, bucket),
+    staleTime: 30000
   });
 
   const updateURL = (params: Record<string, string | null>) => {

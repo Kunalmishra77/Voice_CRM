@@ -9,6 +9,7 @@ interface GlobalFiltersState {
   searchQuery: string;
   selectedAgent: string | null;
   selectedStage: string | null;
+  lastUpdated: number; // Added to force refresh
   
   // Actions
   setDatePreset: (preset: DatePreset) => void;
@@ -30,23 +31,24 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
       searchQuery: '',
       selectedAgent: null,
       selectedStage: null,
+      lastUpdated: Date.now(),
 
       setDatePreset: (preset) => {
         if (preset === 'custom') {
-          set({ datePreset: 'custom' });
+          set({ datePreset: 'custom', lastUpdated: Date.now() });
         } else {
           const range = getRangeFromPreset(preset);
-          set({ datePreset: preset, dateRange: range });
+          set({ datePreset: preset, dateRange: range, lastUpdated: Date.now() });
         }
       },
 
-      setDateRange: (range) => set({ dateRange: range, datePreset: 'custom' }),
+      setDateRange: (range) => set({ dateRange: range, datePreset: 'custom', lastUpdated: Date.now() }),
       
-      setSearchQuery: (query) => set({ searchQuery: query }),
+      setSearchQuery: (query) => set({ searchQuery: query, lastUpdated: Date.now() }),
       
-      setSelectedAgent: (agent) => set({ selectedAgent: agent }),
+      setSelectedAgent: (agent) => set({ selectedAgent: agent, lastUpdated: Date.now() }),
       
-      setSelectedStage: (stage) => set({ selectedStage: stage }),
+      setSelectedStage: (stage) => set({ selectedStage: stage, lastUpdated: Date.now() }),
 
       resetFilters: () => set({
         datePreset: defaultPreset,
@@ -54,6 +56,7 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
         searchQuery: '',
         selectedAgent: null,
         selectedStage: null,
+        lastUpdated: Date.now(),
       }),
     }),
     {

@@ -118,7 +118,7 @@ const RecentActivityTable = React.memo(({ recentLeads, navigate }: { recentLeads
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
-  const { dateRange, datePreset } = useGlobalFilters();
+  const { dateRange, datePreset, lastUpdated } = useGlobalFilters();
 
   const [drilldown, setDrilldown] = useState<{ isOpen: boolean; title: string; date: string; data: LeadInsightRow[] }>({
     isOpen: false, title: '', date: '', data: []
@@ -130,28 +130,33 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<KPIStats>({
-    queryKey: ['dashboard-kpis', dateRange],
+    queryKey: ['dashboard-kpis', dateRange, lastUpdated],
     queryFn: () => dataProvider.getDashboardKPIs(dateRange),
+    staleTime: 30000
   });
 
   const { data: trendData } = useQuery<TrendPoint[]>({
-    queryKey: ['dashboard-trend', dateRange],
+    queryKey: ['dashboard-trend', dateRange, datePreset, lastUpdated],
     queryFn: () => dataProvider.getLeadsTrend(dateRange, datePreset),
+    staleTime: 30000
   });
 
   const { data: stageDistro } = useQuery<StagePoint[]>({
-    queryKey: ['dashboard-stage', dateRange],
+    queryKey: ['dashboard-stage', dateRange, lastUpdated],
     queryFn: () => dataProvider.getStageDistribution(dateRange),
+    staleTime: 30000
   });
 
   const { data: callTrend } = useQuery<VoiceTrendPoint[]>({
-    queryKey: ['dashboard-call-trend', dateRange],
+    queryKey: ['dashboard-call-trend', dateRange, datePreset, lastUpdated],
     queryFn: () => dataProvider.getVoiceTrend(dateRange, datePreset),
+    staleTime: 30000
   });
 
   const { data: recentLeads } = useQuery({
-    queryKey: ['recent-leads'],
-    queryFn: () => dataProvider.getLeads({ range: dateRange, limit: 5 })
+    queryKey: ['recent-leads', lastUpdated],
+    queryFn: () => dataProvider.getLeads({ range: dateRange, limit: 5 }),
+    staleTime: 30000
   });
 
   const handleStatClick = (bucket?: string) => {
