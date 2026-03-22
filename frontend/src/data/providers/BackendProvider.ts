@@ -99,29 +99,25 @@ export class BackendProvider implements IDataProvider {
   async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string): Promise<TrendPoint[]> {
     const leads = await this.getLeads({ range, bucket });
     
-    // Safety check: Cap daily interval to prevent browser hang on large ranges (like All-time)
-    let startDate = safeParseISO(range.from);
-    const endDate = safeParseISO(range.to);
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysDiff > 90) {
-      // If range is too large, only show the last 90 days in the trend chart
-      startDate = subDays(endDate, 89);
-    }
-
     const FINALIZED = ['crm_converted', 'crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
     const isLostBucket = bucket === 'Lost';
     const isConvertedBucket = bucket === 'Converted';
 
-    // Use CallTimestamp (actual call date) for grouping, fallback to created_at
-    // Also expand the interval to cover actual call dates that may be outside the DB insertion range
-    let effectiveStart = startDate;
-    let effectiveEnd = endDate;
-    leads.forEach(l => {
-      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+    // Build interval from actual lead dates (not the query range) to avoid
+    // generating tens of thousands of empty days for All-time ranges
+    if (leads.length === 0) return [];
+    const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+    let effectiveStart = leadDates[0];
+    let effectiveEnd = leadDates[0];
+    leadDates.forEach(d => {
       if (d < effectiveStart) effectiveStart = d;
       if (d > effectiveEnd) effectiveEnd = d;
     });
+    // Safety cap: max 180 days interval even from lead dates
+    const span = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
+    if (span > 180) {
+      effectiveStart = subDays(effectiveEnd, 179);
+    }
 
     const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
     return interval.map(day => {
@@ -241,23 +237,19 @@ export class BackendProvider implements IDataProvider {
   async getVoiceTrend(range: DateRange, _preset: DatePreset): Promise<VoiceTrendPoint[]> {
     const leads = await this.getLeads({ range });
 
-    // Safety check: Cap daily interval
-    let startDate = safeParseISO(range.from);
-    const endDate = safeParseISO(range.to);
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysDiff > 90) {
-      startDate = subDays(endDate, 89);
-    }
-
-    // Expand interval to cover actual call dates
-    let effectiveStart = startDate;
-    let effectiveEnd = endDate;
-    leads.forEach(l => {
-      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+    // Build interval from actual lead dates to avoid massive arrays on All-time
+    if (leads.length === 0) return [];
+    const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+    let effectiveStart = leadDates[0];
+    let effectiveEnd = leadDates[0];
+    leadDates.forEach(d => {
       if (d < effectiveStart) effectiveStart = d;
       if (d > effectiveEnd) effectiveEnd = d;
     });
+    const span = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
+    if (span > 180) {
+      effectiveStart = subDays(effectiveEnd, 179);
+    }
 
     const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
     return interval.map(day => {
@@ -324,13 +316,13 @@ export class BackendProvider implements IDataProvider {
         }
     });
     const topConcerns = Object.entries(concernMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
-    let sStart = safeParseISO(range.from);
-    let sEnd = safeParseISO(range.to);
-    leads.forEach(l => {
-      const d = parseAnyDate(l.CallTimestamp || l.created_at);
-      if (d < sStart) sStart = d;
-      if (d > sEnd) sEnd = d;
-    });
+    if (leads.length === 0) return { sentimentTrend: [], topConcerns, highIntentLeads: [] };
+    const sDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+    let sStart = sDates[0];
+    let sEnd = sDates[0];
+    sDates.forEach(d => { if (d < sStart) sStart = d; if (d > sEnd) sEnd = d; });
+    const sSpan = Math.ceil((sEnd.getTime() - sStart.getTime()) / (1000 * 60 * 60 * 24));
+    if (sSpan > 180) sStart = subDays(sEnd, 179);
     const interval = eachDayOfInterval({ start: sStart, end: sEnd });
     const sentimentTrend = interval.map(day => {
         const dayLeads = leads.filter(l => isSameDay(parseAnyDate(l.CallTimestamp || l.created_at), day));
