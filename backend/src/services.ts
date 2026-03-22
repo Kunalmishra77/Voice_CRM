@@ -28,8 +28,8 @@ export const conversationService = {
     const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
     if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.summary}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     const { data, count, error } = await query.order(COLS.leads.created_at, { ascending: false }).range(from, to);
     if (error) throw error;
     return {
@@ -96,8 +96,8 @@ export const leadService = {
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
     
     if (q) query = query.or(`"${COLS.leads.name}".ilike.%${q}%,"${COLS.leads.phone}".ilike.%${q}%`);
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     
     // Improved Stage Filtering
     if (stage && stage !== 'all') {
@@ -158,8 +158,8 @@ export const dashboardService = {
   getStats: async (filters: any = {}) => {
     const { date_from, date_to } = filters;
     let query = supabase.from(LEADS_TABLE).select(`"${COLS.leads.status}", "${COLS.leads.sentiment}", "${COLS.leads.phone}"`, { count: 'exact' });
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00Z`);
+    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59Z`);
     const { data, count } = await query;
     const status_counts: any = { [CRM_CONVERTED]: 0, [CRM_LOST]: 0 };
     const sentiment_counts: any = { Hot: 0, Warm: 0, Cold: 0, null: 0 };
