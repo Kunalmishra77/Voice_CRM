@@ -96,7 +96,6 @@ export class BackendProvider implements IDataProvider {
       'Hot': '#ef4444', 
       'Warm': '#f59e0b', 
       'Cold': '#3b82f6', 
-      'Average': '#10b981',
       'Converted': '#06b6d4',
       'Lost': '#64748b'
     };
@@ -104,6 +103,7 @@ export class BackendProvider implements IDataProvider {
     const total = Object.values(distData).reduce((a: any, b: any) => a + b, 0) as number || 1;
 
     return Object.entries(distData)
+      .filter(([name]) => name !== 'Average')
       .map(([name, value]) => ({
         name,
         value: Math.round(((value as number) / total) * 100),

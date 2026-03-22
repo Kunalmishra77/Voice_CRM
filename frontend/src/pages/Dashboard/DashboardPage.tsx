@@ -54,11 +54,10 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
 };
 
 const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undefined, handleStatClick: (b?: string) => void }) => (
-  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
     <StatCard label="Total Leads" value={kpis?.totalLeads ?? 0} icon={Users} variant="teal" onClick={() => handleStatClick('all')} />
     <StatCard label="Hot" value={kpis?.hotLeads ?? 0} icon={Flame} variant="orange" onClick={() => handleStatClick('Hot')} />
     <StatCard label="Warm" value={kpis?.warmLeads ?? 0} icon={Zap} variant="purple" onClick={() => handleStatClick('Warm')} />
-    <StatCard label="Average" value={kpis?.avgLeads ?? 0} icon={Target} variant="teal" onClick={() => handleStatClick('Average')} />
     <StatCard label="Cold" value={kpis?.coldLeads ?? 0} icon={Activity} variant="blue" onClick={() => handleStatClick('Cold')} />
     <StatCard label="Converted" value={kpis?.converted ?? 0} icon={CheckCircle2} variant="teal" onClick={() => handleStatClick('Converted')} />
     <StatCard label="Lost" value={kpis?.unconverted ?? 0} icon={XCircle} variant="danger" onClick={() => handleStatClick('Lost')} />

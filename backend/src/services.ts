@@ -195,7 +195,7 @@ export const dashboardService = {
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
     console.log('[metrics] returned', data?.length, 'rows, total:', count);
 
-    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Average: 0, Converted: 0, Lost: 0 };
+    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Converted: 0, Lost: 0 };
     const phones = new Set();
     
     (data || []).forEach((row: any) => {
@@ -208,10 +208,13 @@ export const dashboardService = {
           stage_counts.Lost++;
         } else {
           // It's a pending/active lead, count its sentiment
-          if (stage_counts[sent] !== undefined) {
-            stage_counts[sent]++;
+          if (sent === 'Hot') {
+            stage_counts.Hot++;
+          } else if (sent === 'Cold') {
+            stage_counts.Cold++;
           } else {
-            stage_counts.Average++;
+            // Everything else (Warm, Average, null) goes to Warm
+            stage_counts.Warm++;
           }
         }
         
@@ -223,7 +226,6 @@ export const dashboardService = {
       Hot: stage_counts.Hot,
       Warm: stage_counts.Warm,
       Cold: stage_counts.Cold,
-      Average: stage_counts.Average,
       Converted: stage_counts.Converted,
       Lost: stage_counts.Lost,
       Pending: (count || 0) - stage_counts.Converted - stage_counts.Lost
