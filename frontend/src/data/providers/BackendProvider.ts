@@ -81,7 +81,7 @@ export class BackendProvider implements IDataProvider {
       return {
         name: safeFormat(day, 'MMM dd'),
         hot: dayLeads.filter(l => l.sentiment === 'Hot').length,
-        warm: dayLeads.filter(l => l.sentiment === 'Warm').length,
+        warm: dayLeads.filter(l => l.sentiment === 'Warm' || l.sentiment === 'Average' || !l.sentiment).length,
         cold: dayLeads.filter(l => l.sentiment === 'Cold').length,
         converted: dayLeads.filter(l => (l.status as any) === 'crm_converted').length,
         from: safeFormat(day, 'yyyy-MM-dd'),
