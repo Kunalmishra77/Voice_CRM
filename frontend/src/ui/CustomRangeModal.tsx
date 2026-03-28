@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { Save } from 'lucide-react';
+import { Save, Calendar as CalendarIcon, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRangeLabel } from '../utils/dateRange';
+import { format, subDays } from 'date-fns';
 
 interface CustomRangeModalProps {
   isOpen: boolean;
@@ -22,6 +23,20 @@ export const CustomRangeModal: React.FC<CustomRangeModalProps> = ({
 }) => {
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
+
+  // When opening, if dates are extreme (allTime), reset to something sensible
+  useEffect(() => {
+    if (isOpen) {
+      if (initialFrom.startsWith('2000') || initialTo.startsWith('2100')) {
+        const now = new Date();
+        setFrom(format(subDays(now, 30), 'yyyy-MM-dd'));
+        setTo(format(now, 'yyyy-MM-dd'));
+      } else {
+        setFrom(initialFrom);
+        setTo(initialTo);
+      }
+    }
+  }, [isOpen, initialFrom, initialTo]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,36 +57,51 @@ export const CustomRangeModal: React.FC<CustomRangeModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Custom Date Range"
+      title="Select Custom Range"
+      className="max-w-sm"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground pl-1">From Date</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-xl p-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-              required
-            />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase text-muted-foreground/70 tracking-wider ml-1">Start Date</label>
+            <div className="relative group">
+              <CalendarIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-full bg-secondary/50 border border-border rounded-xl py-3 pl-10 pr-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all hover:bg-secondary cursor-pointer appearance-none"
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground pl-1">To Date</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-xl p-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-              required
-            />
+
+          <div className="flex justify-center -my-2 relative z-10">
+            <div className="bg-background p-1.5 rounded-full border border-border shadow-sm">
+              <ArrowRight size={14} className="text-muted-foreground rotate-90" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase text-muted-foreground/70 tracking-wider ml-1">End Date</label>
+            <div className="relative group">
+              <CalendarIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full bg-secondary/50 border border-border rounded-xl py-3 pl-10 pr-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all hover:bg-secondary cursor-pointer appearance-none"
+                required
+              />
+            </div>
           </div>
         </div>
-        <div className="flex flex-col gap-3 pt-4">
-          <Button type="submit" variant="primary" className="w-full py-3.5 rounded-xl">
+
+        <div className="pt-2 flex flex-col gap-2">
+          <Button type="submit" variant="primary" className="w-full py-3 rounded-xl font-semibold shadow-lg shadow-primary/20">
             <Save size={16} className="mr-2" /> Apply Range
           </Button>
-          <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={onClose}>
+          <Button type="button" variant="ghost" className="w-full text-muted-foreground text-sm font-medium" onClick={onClose}>
             Cancel
           </Button>
         </div>
@@ -79,3 +109,5 @@ export const CustomRangeModal: React.FC<CustomRangeModalProps> = ({
     </Modal>
   );
 };
+
+

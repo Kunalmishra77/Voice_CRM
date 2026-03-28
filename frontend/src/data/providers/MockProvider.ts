@@ -383,4 +383,13 @@ export class MockProvider implements IDataProvider {
       resolve(true);
     }, 200));
   }
+
+  async createBulkTasks(_tasks: Partial<LeadTask>[]): Promise<{ success: boolean; created: number }> {
+    return { success: true, created: 0 };
+  }
+  async updateTaskById(_id: string, _updates: Partial<LeadTask>): Promise<boolean> { return true; }
+  async deleteTaskById(_id: string): Promise<boolean> { return true; }
+  async getEmployees(): Promise<any[]> { return []; }
+  async getTaskStats(_filters?: Record<string, any>): Promise<any> { return { total: 0, pending: 0, overdue: 0, completed: 0, byEmployee: {} }; }
+  async getLiveCallActivity(): Promise<any> { return { summary: { total_today: 0, queued: 0, calling: 0, completed: 0, failed: 0 }, active_calls: [], recent_completed: [], recent_failed: [], last_updated: new Date().toISOString() }; }
 }

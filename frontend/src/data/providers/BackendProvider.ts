@@ -1,5 +1,5 @@
 import type { DateRange, DatePreset } from '../../utils/dateRange';
-import { bGet, bPost, bPatch } from '../backendApi';
+import { bGet, bPost, bPatch, bDelete } from '../backendApi';
 import type { IDataProvider } from '../IDataProvider';
 import { eachDayOfInterval, isSameDay, parseISO, subDays } from 'date-fns';
 import { safeFormat, safeParseISO } from '../../lib/utils';
@@ -21,19 +21,19 @@ import type {
   ExportHistoryItem,
   FetchLeadsParams,
   UpdateLeadStatusParams,
-  UpdateLeadStatusResult
+  UpdateLeadStatusResult,
+  LiveCallActivity
 } from '../types';
 
 /** Robust date parser for trend grouping */
 function parseAnyDate(dateStr: any): Date {
   if (!dateStr) return new Date();
   if (dateStr instanceof Date) return dateStr;
-  
   try {
     // 1. Try standard ISO
     const d = parseISO(dateStr);
     if (!isNaN(d.getTime())) return d;
-    
+
     // 2. Try parsing custom format "2:00 pmThursday, 12 March 2026"
     if (typeof dateStr === 'string') {
       const dateMatch = dateStr.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
@@ -42,13 +42,21 @@ function parseAnyDate(dateStr: any): Date {
         if (!isNaN(d2.getTime())) return d2;
       }
     }
-    
+
     // 3. Fallback
     const d3 = new Date(dateStr);
     return isNaN(d3.getTime()) ? new Date() : d3;
   } catch (e) {
     return new Date();
   }
+}
+
+/** Normalize lead status to stable buckets (Converted/Lost/Pending) */
+function normalizeStatus(raw: any): 'Converted' | 'Lost' | 'Pending' {
+  const status = String(raw || '').toLowerCase().trim();
+  if (status === 'crm_converted' || status === 'converted') return 'Converted';
+  if (status === 'crm_lost' || status === 'lost' || ['not interested', 'wrong number', 'busy', 'voicemail'].includes(status)) return 'Lost';
+  return 'Pending';
 }
 
 export class BackendProvider implements IDataProvider {
@@ -88,6 +96,7 @@ export class BackendProvider implements IDataProvider {
           }
           return l.created_at;
         })(),
+        recording_url: l.recording_url || null,
         scoring: {
             score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : 34,
             bucket: l.sentiment,
@@ -99,35 +108,60 @@ export class BackendProvider implements IDataProvider {
   async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string): Promise<TrendPoint[]> {
     const leads = await this.getLeads({ range, bucket });
     
-    const FINALIZED = ['crm_converted', 'crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
-    const isLostBucket = bucket === 'Lost';
-    const isConvertedBucket = bucket === 'Converted';
+    const isLostBucket = bucket?.toLowerCase() === 'lost';
+    const isConvertedBucket = bucket?.toLowerCase() === 'converted';
 
-    // Build interval from actual lead dates (not the query range) to avoid
-    // generating tens of thousands of empty days for All-time ranges
-    if (leads.length === 0) return [];
-    const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
-    let effectiveStart = leadDates[0];
-    let effectiveEnd = leadDates[0];
-    leadDates.forEach(d => {
-      if (d < effectiveStart) effectiveStart = d;
-      if (d > effectiveEnd) effectiveEnd = d;
-    });
-    // Safety cap: max 180 days interval even from lead dates
-    const span = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
-    if (span > 180) {
-      effectiveStart = subDays(effectiveEnd, 179);
+    // Determine interval range
+    let start = safeParseISO(range.from);
+    let end = safeParseISO(range.to);
+    const requestedSpan = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+    // For large spans (Yearly, All-time, Global Range), bound by actual data to avoid huge sparse graphs
+    if (requestedSpan > 31 && leads.length > 0) {
+      const now = new Date();
+      const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+      let discoveredStart = leadDates[0];
+      let discoveredEnd = leadDates[0];
+      leadDates.forEach(d => {
+        if (d < discoveredStart) discoveredStart = d;
+        if (d > discoveredEnd) discoveredEnd = d;
+      });
+      
+      // CAP to today to avoid future date outliers (like Nov 03) stretching the graph
+      if (discoveredEnd > now) discoveredEnd = now;
+      
+      const discoveredSpan = Math.ceil((discoveredEnd.getTime() - discoveredStart.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (requestedSpan > 90) {
+        start = discoveredSpan > 180 ? subDays(discoveredEnd, 179) : discoveredStart;
+        end = discoveredEnd;
+        
+        // Visual consistency: at least 7 days
+        if (Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) < 7) {
+          start = subDays(end, 6);
+        }
+      }
     }
 
-    const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
-    return interval.map(day => {
-      const dayLeads = leads.filter(l => {
-        const leadDate = parseAnyDate(l.CallTimestamp || l.created_at);
-        return isSameDay(leadDate, day);
-      });
+    const interval = eachDayOfInterval({ start, end });
+    
+    // Group by CallTimestamp (the actual call date) to match user expectations
+    const leadsWithDayStrings = leads.map(l => {
+      const ts = l.CallTimestamp || l.created_at || '';
+      const dayStr = typeof ts === 'string' && ts.includes('T') 
+        ? ts.split('T')[0] 
+        : safeFormat(parseAnyDate(ts), 'yyyy-MM-dd');
+      
+      return {
+        ...l,
+        dayString: dayStr
+      };
+    });
 
-      // For Lost/Converted buckets: all returned leads ARE lost/converted,
-      // so show their sentiment breakdown in hot/warm/cold bars
+    return interval.map(day => {
+      const dayStr = safeFormat(day, 'yyyy-MM-dd');
+      const dayLeads = leadsWithDayStrings.filter(l => l.dayString === dayStr);
+
       if (isLostBucket || isConvertedBucket) {
         return {
           name: safeFormat(day, 'MMM dd'),
@@ -136,22 +170,21 @@ export class BackendProvider implements IDataProvider {
           cold: dayLeads.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
           converted: 0,
           lost: 0,
-          from: safeFormat(day, 'yyyy-MM-dd'),
-          to: safeFormat(day, 'yyyy-MM-dd')
+          from: dayStr,
+          to: dayStr
         };
       }
 
-      // For other buckets: separate finalized vs pending to avoid double-counting
-      const pending = dayLeads.filter(l => !FINALIZED.includes((l.status as any) || ''));
+      const pending = dayLeads.filter(l => normalizeStatus(l.status) === 'Pending');
       return {
         name: safeFormat(day, 'MMM dd'),
         hot: pending.filter(l => (l.sentiment || '').toLowerCase() === 'hot').length,
         warm: pending.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average' || !s; }).length,
         cold: pending.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
-        converted: dayLeads.filter(l => (l.status as any) === 'crm_converted').length,
-        lost: dayLeads.filter(l => ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes((l.status as any))).length,
-        from: safeFormat(day, 'yyyy-MM-dd'),
-        to: safeFormat(day, 'yyyy-MM-dd')
+        converted: dayLeads.filter(l => normalizeStatus(l.status) === 'Converted').length,
+        lost: dayLeads.filter(l => normalizeStatus(l.status) === 'Lost').length,
+        from: dayStr,
+        to: dayStr
       };
     });
   }
@@ -237,33 +270,61 @@ export class BackendProvider implements IDataProvider {
   async getVoiceTrend(range: DateRange, _preset: DatePreset): Promise<VoiceTrendPoint[]> {
     const leads = await this.getLeads({ range });
 
-    // Build interval from actual lead dates to avoid massive arrays on All-time
-    if (leads.length === 0) return [];
-    const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
-    let effectiveStart = leadDates[0];
-    let effectiveEnd = leadDates[0];
-    leadDates.forEach(d => {
-      if (d < effectiveStart) effectiveStart = d;
-      if (d > effectiveEnd) effectiveEnd = d;
-    });
-    const span = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
-    if (span > 180) {
-      effectiveStart = subDays(effectiveEnd, 179);
+    // Determine interval range
+    let start = safeParseISO(range.from);
+    let end = safeParseISO(range.to);
+    const requestedSpan = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+    // For Global/All Time (large spans), use discovery
+    if (requestedSpan > 31 && leads.length > 0) {
+      const now = new Date();
+      const leadDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+      let discoveredStart = leadDates[0];
+      let discoveredEnd = leadDates[0];
+      leadDates.forEach(d => {
+        if (d < discoveredStart) discoveredStart = d;
+        if (d > discoveredEnd) discoveredEnd = d;
+      });
+
+      // CAP to today to avoid future date outliers stretching the graph
+      if (discoveredEnd > now) discoveredEnd = now;
+
+      const discoveredSpan = Math.ceil((discoveredEnd.getTime() - discoveredStart.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (requestedSpan > 90) {
+        start = discoveredSpan > 180 ? subDays(discoveredEnd, 179) : discoveredStart;
+        end = discoveredEnd;
+        if (Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) < 7) {
+          start = subDays(end, 6);
+        }
+      }
     }
 
-    const interval = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
+    const interval = eachDayOfInterval({ start, end });
+    
+    // Group by call date (CallTimestamp)
+    const leadsWithDayStrings = leads.map(l => {
+      const ts = l.CallTimestamp || l.created_at || '';
+      const dayStr = typeof ts === 'string' && ts.includes('T') 
+        ? ts.split('T')[0] 
+        : safeFormat(parseAnyDate(ts), 'yyyy-MM-dd');
+      
+      return {
+        ...l,
+        dayString: dayStr
+      };
+    });
+
     return interval.map(day => {
-        const dayLeads = leads.filter(l => {
-          const leadDate = parseAnyDate(l.CallTimestamp || l.created_at);
-          return isSameDay(leadDate, day);
-        });
+        const dayStr = safeFormat(day, 'yyyy-MM-dd');
+        const dayLeads = leadsWithDayStrings.filter(l => l.dayString === dayStr);
         return {
           name: safeFormat(day, 'MMM dd'),
           messages: dayLeads.length,
           sessions: dayLeads.length,
           contacts: new Set(dayLeads.map(l => l['Phone Number'])).size,
-          from: safeFormat(day, 'yyyy-MM-dd'),
-          to: safeFormat(day, 'yyyy-MM-dd')
+          from: dayStr,
+          to: dayStr
         };
     });
   }
@@ -276,7 +337,8 @@ export class BackendProvider implements IDataProvider {
         name: c['User Name'],
         lastMessage: c['User Message'],
         lastTimestamp: c['Timestamp'],
-        status: 'Done'
+        status: 'Done',
+        recording_url: c.recording_url || null
     }));
   }
 
@@ -336,9 +398,77 @@ export class BackendProvider implements IDataProvider {
     return { sentimentTrend, topConcerns, highIntentLeads: leads.filter(l => l.sentiment === 'Hot').slice(0, 10) };
   }
 
-  async getTasks(_range: DateRange): Promise<LeadTask[]> { return []; }
-  async createTask(_task: Partial<LeadTask>): Promise<boolean> { return true; }
-  async toggleTaskDone(_id: string, _currentStatus: boolean): Promise<boolean> { return true; }
+  async getTasks(_range: DateRange, filters?: Record<string, any>): Promise<LeadTask[]> {
+    try {
+      const data = await bGet('/tasks', filters);
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error('[BackendProvider] getTasks error:', e);
+      return [];
+    }
+  }
+
+  async createTask(task: Partial<LeadTask>): Promise<boolean> {
+    try {
+      await bPost('/tasks', task);
+      return true;
+    } catch (e) {
+      console.error('[BackendProvider] createTask error:', e);
+      return false;
+    }
+  }
+
+  async createBulkTasks(tasks: Partial<LeadTask>[]): Promise<{ success: boolean; created: number }> {
+    try {
+      const res = await bPost('/tasks/bulk', { tasks });
+      return { success: true, created: res.created || 0 };
+    } catch (e) {
+      console.error('[BackendProvider] createBulkTasks error:', e);
+      return { success: false, created: 0 };
+    }
+  }
+
+  async updateTaskById(id: string, updates: Partial<LeadTask>): Promise<boolean> {
+    try {
+      await bPatch(`/tasks/${id}`, updates);
+      return true;
+    } catch (e) {
+      console.error('[BackendProvider] updateTask error:', e);
+      return false;
+    }
+  }
+
+  async deleteTaskById(id: string): Promise<boolean> {
+    try {
+      await bDelete(`/tasks/${id}`);
+      return true;
+    } catch (e) {
+      console.error('[BackendProvider] deleteTask error:', e);
+      return false;
+    }
+  }
+
+  async getEmployees(): Promise<any[]> {
+    try {
+      return await bGet('/employees');
+    } catch (e) {
+      console.error('[BackendProvider] getEmployees error:', e);
+      return [];
+    }
+  }
+
+  async getTaskStats(filters?: Record<string, any>): Promise<any> {
+    try {
+      return await bGet('/tasks/stats', filters);
+    } catch (e) {
+      console.error('[BackendProvider] getTaskStats error:', e);
+      return { total: 0, pending: 0, overdue: 0, completed: 0, byEmployee: {} };
+    }
+  }
+
+  async toggleTaskDone(id: string, currentStatus: boolean): Promise<boolean> {
+    return this.updateTaskById(id, { done: !currentStatus });
+  }
   async getReportsData(_range: DateRange): Promise<ReportsData> { return { conversionRatio: [], sentimentSplit: [], engagementMetrics: [], performanceTrend: [] }; }
   async getExportHistory(_range: DateRange): Promise<ExportHistoryItem[]> { return []; }
   async logExportAction(_fmt: string, _count: number, _range: DateRange): Promise<boolean> { return true; }
@@ -355,5 +485,9 @@ export class BackendProvider implements IDataProvider {
   async toggleWorkedStatus(_leadId: string, phone: string, currentStatus: boolean): Promise<boolean> {
     await bPatch(`/proxy/states/by-phone/${phone}`, { worked_flag: !currentStatus });
     return true;
+  }
+
+  async getLiveCallActivity(): Promise<LiveCallActivity> {
+    return bGet('/live/activity');
   }
 }

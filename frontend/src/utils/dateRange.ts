@@ -32,19 +32,18 @@ export const getRangeFromPreset = (preset: DatePreset, now: Date = new Date()): 
   let from: Date;
   let to: Date = endOfToday();
 
-  // Basic adjustment for Asia/Kolkata if needed could be done here, 
-  // but usually browser local time is what the user expects for "Today".
-
   switch (preset) {
     case 'daily':
       from = startOfToday();
       to = endOfToday();
       break;
     case 'weekly':
-      from = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-      to = endOfWeek(now, { weekStartsOn: 1 });
+      // User requested "before 7 days data from today"
+      from = subDays(now, 6); // Total 7 days including today
+      to = endOfToday();
       break;
     case 'monthly':
+      // User requested "this month" to show like that
       from = startOfMonth(now);
       to = endOfMonth(now);
       break;
@@ -53,7 +52,6 @@ export const getRangeFromPreset = (preset: DatePreset, now: Date = new Date()): 
       to = endOfQuarter(now);
       break;
     case 'halfYearly':
-      // From 6 months ago (start of month) to end of current month
       from = startOfMonth(subMonths(now, 5));
       to = endOfMonth(now);
       break;
@@ -68,7 +66,7 @@ export const getRangeFromPreset = (preset: DatePreset, now: Date = new Date()): 
     case 'custom':
     default:
       from = subDays(now, 6);
-      to = now;
+      to = endOfToday();
       break;
   }
 

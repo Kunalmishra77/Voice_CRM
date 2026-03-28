@@ -18,7 +18,10 @@ import {
   Phone,
   UserCheck,
   X,
-  CheckCircle
+  CheckCircle,
+  Headphones,
+  Play,
+  Volume2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -174,14 +177,47 @@ const LeadDetailPage: React.FC = () => {
             </div>
           </SectionCard>
 
+          {/* Call Recording Player */}
+          <SectionCard title="Call Recording" subtitle="Listen to the voice recording." icon={<Headphones size={16} style={{ color: 'var(--brand-500)' }} />}>
+            {lead.recording_url ? (
+              <div className="py-4 space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-2xl bg-secondary border border-border">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--brand-100)' }}>
+                    <Volume2 size={18} style={{ color: 'var(--brand-600)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-foreground mb-2">Voice Recording</p>
+                    <audio
+                      controls
+                      controlsList="nodownload"
+                      preload="metadata"
+                      className="w-full h-10 rounded-lg"
+                      style={{ maxWidth: '100%' }}
+                    >
+                      <source src={lead.recording_url} />
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-3">
+                  <Headphones size={20} className="text-muted-foreground" />
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground">No recording available for this lead.</p>
+              </div>
+            )}
+          </SectionCard>
+
           <SectionCard title="Call History" subtitle="Previous interactions." icon={<History size={16} className="text-purple-500" />}>
              <div className="space-y-4">
                 {leadCalls.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No call history found.</p>
                 ) : (
                   leadCalls.map((call, i) => (
-                    <div key={i} className="p-4 rounded-2xl bg-secondary border border-transparent hover:border-border transition-all cursor-pointer group" onClick={() => navigate(`/calls?sessionId=${call.sessionId}`)}>
-                       <div className="flex justify-between items-center mb-2">
+                    <div key={i} className="p-4 rounded-2xl bg-secondary border border-transparent hover:border-border transition-all group">
+                       <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => navigate(`/calls?sessionId=${call.sessionId}`)}>
                           <span className="text-xs font-semibold text-foreground">{call.status === 'Done' ? 'Completed' : 'Active'}</span>
                           <span className="text-[9px] font-bold text-muted-foreground">
                             {(() => {
@@ -193,7 +229,12 @@ const LeadDetailPage: React.FC = () => {
                             })()}
                           </span>
                        </div>
-                       <p className="text-[11px] font-medium text-muted-foreground line-clamp-1">"{call.lastMessage}"</p>
+                       <p className="text-[11px] font-medium text-muted-foreground line-clamp-1 cursor-pointer mb-2" onClick={() => navigate(`/calls?sessionId=${call.sessionId}`)}>"{call.lastMessage}"</p>
+                       {call.recording_url && (
+                         <audio controls controlsList="nodownload" preload="none" className="w-full h-8 mt-1" style={{ maxWidth: '100%' }}>
+                           <source src={call.recording_url} />
+                         </audio>
+                       )}
                     </div>
                   ))
                 )}

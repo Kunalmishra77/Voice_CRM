@@ -4,9 +4,11 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footer } from './Footer';
 import { cn } from '../lib/utils';
+import { useNotificationEngine } from '../hooks/useNotificationEngine';
 
 export const AppShell: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  useNotificationEngine(); // generates real CRM notifications in background
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">

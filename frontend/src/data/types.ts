@@ -35,6 +35,7 @@ export interface LeadInsightRow {
   owner?: string;
   CallTimestamp?: string;
   duration?: string | number;
+  recording_url?: string | null;
 }
 
 export interface TrendPoint {
@@ -99,6 +100,7 @@ export interface ChatSession {
   lastTimestamp: string;
   status: 'NA' | 'Done';
   leadId?: string;
+  recording_url?: string | null;
 }
 
 export interface LeadInsightsSummary {
@@ -119,6 +121,20 @@ export interface LeadTask {
   done_at?: string;
   created_at: string;
   lead_name?: string;
+  lead_sentiment?: string | null;
+  assigned_to?: string | null;
+  assigned_by?: string | null;
+  assignment_type?: 'specific' | 'bulk' | 'hot' | 'warm' | 'cold' | 'custom';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'employee';
+  phone?: string;
+  department?: string;
 }
 
 export interface ReportsData {
@@ -159,6 +175,31 @@ export interface UpdateLeadStatusParams {
 export interface UpdateLeadStatusResult {
   success: boolean;
   message?: string;
+}
+
+export interface LiveCallRecord {
+  id: string;
+  name: string;
+  phone: string;
+  raw_status: string;
+  call_status: 'queued' | 'calling' | 'completed' | 'failed';
+  sentiment: string;
+  duration: number;
+  created_at: string;
+}
+
+export interface LiveCallActivity {
+  summary: {
+    total_today: number;
+    queued: number;
+    calling: number;
+    completed: number;
+    failed: number;
+  };
+  active_calls: LiveCallRecord[];
+  recent_completed: LiveCallRecord[];
+  recent_failed: LiveCallRecord[];
+  last_updated: string;
 }
 
 export interface FunnelStep {

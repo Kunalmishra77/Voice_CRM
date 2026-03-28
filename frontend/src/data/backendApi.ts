@@ -62,3 +62,12 @@ export const bPatch = async (path: string, body?: any) => {
     });
     return handleResponse(res);
 };
+
+/** DELETE request */
+export const bDelete = async (path: string) => {
+    const res = await fetch(buildUrl(path), {
+        method: 'DELETE',
+        headers: getHeaders(),
+    });
+    return handleResponse(res);
+};

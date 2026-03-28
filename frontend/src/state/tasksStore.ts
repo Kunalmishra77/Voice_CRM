@@ -12,6 +12,11 @@ export interface LeadTask {
   done: boolean;
   created_at: string;
   done_at?: string;
+  lead_sentiment?: string | null;
+  assigned_to?: string | null;
+  assigned_by?: string | null;
+  assignment_type?: string;
+  priority?: string;
 }
 
 interface TasksStore {
@@ -38,7 +43,7 @@ export const useTasksStore = create<TasksStore>()(
         ]
       })),
       toggleTask: (id) => set((state) => ({
-        tasks: state.tasks.map((t) => 
+        tasks: state.tasks.map((t) =>
           t.id === id ? { ...t, done: !t.done, done_at: !t.done ? new Date().toISOString() : undefined } : t
         )
       })),
@@ -46,7 +51,7 @@ export const useTasksStore = create<TasksStore>()(
         tasks: state.tasks.filter((t) => t.id !== id)
       })),
       updateTask: (id, updates) => set((state) => ({
-        tasks: state.tasks.map((t) => 
+        tasks: state.tasks.map((t) =>
           t.id === id ? { ...t, ...updates } : t
         )
       })),

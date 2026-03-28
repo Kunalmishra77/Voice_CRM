@@ -50,7 +50,7 @@ function getTimeframeRange(tf: string, globalRange: { from: string; to: string }
   const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
   switch (tf) {
     case 'today': return { from: fmt(now), to: fmt(now) };
-    case 'week': return { from: fmt(startOfWeek(now, { weekStartsOn: 1 })), to: fmt(endOfWeek(now, { weekStartsOn: 1 })) };
+    case 'week': return { from: fmt(subDays(now, 6)), to: fmt(now) };
     case 'month': return { from: fmt(startOfMonth(now)), to: fmt(endOfMonth(now)) };
     case 'quarter': return { from: fmt(startOfQuarter(now)), to: fmt(endOfQuarter(now)) };
     case 'all': return { from: '2000-01-01', to: '2100-12-31' };
