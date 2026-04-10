@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Search, LayoutDashboard, Table as TableIcon, Download, ChevronRight, Loader2, TrendingUp, Target, CheckCircle2, Circle, X, ChevronDown, Calendar, Eye, FileSearch
+  Search, LayoutDashboard, Table as TableIcon, Download, ChevronRight, Loader2, TrendingUp, Target, CheckCircle2, Circle, X, ChevronDown, Calendar, Eye, FileSearch, ListChecks, Pencil, Trash2, CheckCircle, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarte
 
 import { dataProvider } from '../../data/dataProvider';
 import { type LeadInsightRow } from '../../data/api';
+import { type LeadOutcome } from '../../data/types';
 import { useGlobalFilters } from '../../state/globalFiltersStore';
 import { cn } from '../../lib/utils';
 
@@ -29,7 +30,8 @@ import {
 /* ─── Constants ─── */
 const COLORS: Record<string, string> = {
   Hot: '#ef4444', Warm: '#f59e0b', Cold: '#3b82f6',
-  Converted: '#06b6d4', Lost: '#64748b', Pending: '#a855f7'
+  Converted: '#06b6d4', Lost: '#64748b', Pending: '#a855f7',
+  DemoBooked: '#8b5cf6', Callback: '#f97316'
 };
 
 const LOST_STATUSES = ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
@@ -39,6 +41,8 @@ const BUCKET_OPTIONS = [
   { value: 'Hot', label: 'Hot' },
   { value: 'Warm', label: 'Warm' },
   { value: 'Cold', label: 'Cold' },
+  { value: 'DemoBooked', label: 'Demo Booked' },
+  { value: 'Callback', label: 'Callback' },
   { value: 'Converted', label: 'Converted' },
   { value: 'Lost', label: 'Lost' },
   { value: 'Pending', label: 'Pending' },
@@ -193,14 +197,17 @@ const ChartEmptyState = () => (
 const LeadsExplorerPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dateRange, searchQuery, selectedAgent, selectedStage, lastUpdated } = useGlobalFilters();
+  const { dateRange, searchQuery, selectedAgent, selectedStage, lastUpdated, leadType } = useGlobalFilters();
   const range = dateRange;
   const queryParams = new URLSearchParams(location.search);
 
-  const activeTab = (queryParams.get('tab') as 'overview' | 'table') || 'overview';
+  const activeTab = (queryParams.get('tab') as 'overview' | 'table' | 'outcomes') || 'overview';
   const bucket = queryParams.get('bucket') || 'all';
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  // selectedIds persists across bucket changes — cross-category multi-select
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Cache of all loaded leads for cross-bucket export
+  const [selectedLeadsCache, setSelectedLeadsCache] = useState<Record<string, LeadInsightRow>>({});
   const [isMounted, setIsMounted] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -217,32 +224,79 @@ const LeadsExplorerPage: React.FC = () => {
     isOpen: false, lead: null, type: null
   });
 
+  // Outcomes state
+  const queryClient = useQueryClient();
+  const [outcomeFilter, setOutcomeFilter] = useState<'all' | 'Converted' | 'Lost'>('all');
+  const [outcomeSearch, setOutcomeSearch] = useState('');
+  const [editingOutcome, setEditingOutcome] = useState<LeadOutcome | null>(null);
+  const [editForm, setEditForm] = useState({ reason: '', note: '' });
+
+  const { data: outcomes, isLoading: outcomesLoading } = useQuery({
+    queryKey: ['outcomes', outcomeFilter, lastUpdated],
+    queryFn: () => dataProvider.getOutcomes({ outcome: outcomeFilter === 'all' ? undefined : outcomeFilter }),
+    staleTime: 0,
+  });
+
+  const filteredOutcomes = useMemo(() => {
+    if (!outcomes) return [];
+    if (!outcomeSearch) return outcomes;
+    const q = outcomeSearch.toLowerCase();
+    return outcomes.filter((o: LeadOutcome) =>
+      o.lead_name?.toLowerCase().includes(q) ||
+      o.phone_number?.includes(q) ||
+      o.reason?.toLowerCase().includes(q)
+    );
+  }, [outcomes, outcomeSearch]);
+
+  const updateOutcomeMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { reason?: string; note?: string } }) =>
+      dataProvider.updateOutcome(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['outcomes'] });
+      toast.success('Outcome updated');
+      setEditingOutcome(null);
+    },
+    onError: () => toast.error('Failed to update'),
+  });
+
+  const deleteOutcomeMutation = useMutation({
+    mutationFn: (id: string) => dataProvider.deleteOutcome(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['outcomes'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-table'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-trend'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      toast.success('Outcome deleted — lead status reverted');
+    },
+    onError: () => toast.error('Failed to delete'),
+  });
+
   // Effective ranges for each graph
   const trendRange = useMemo(() => getTimeframeRange(trendTimeframe, range), [trendTimeframe, range]);
   const pieRange = useMemo(() => getTimeframeRange(pieTimeframe, range), [pieTimeframe, range]);
 
   /* ─── Data Queries ─── */
   const { data: leads, isLoading: leadsLoading } = useQuery({
-    queryKey: ['leads-table', dateRange, bucket, localSearch, selectedAgent, selectedStage, lastUpdated],
-    queryFn: () => dataProvider.getLeads({ range, bucket, search: localSearch, agent: selectedAgent, stage: selectedStage }),
+    queryKey: ['leads-table', dateRange, bucket, localSearch, selectedAgent, selectedStage, lastUpdated, leadType],
+    queryFn: () => dataProvider.getLeads({ range, bucket, search: localSearch, agent: selectedAgent, stage: selectedStage, leadType }),
     staleTime: 30000
   });
 
   const { data: kpis } = useQuery({
-    queryKey: ['dashboard-kpis', range, lastUpdated],
-    queryFn: () => dataProvider.getDashboardKPIs(range),
+    queryKey: ['dashboard-kpis', range, lastUpdated, leadType],
+    queryFn: () => dataProvider.getDashboardKPIs(range, leadType),
     staleTime: 30000
   });
 
   const { data: trendData } = useQuery({
-    queryKey: ['leads-trend', trendRange, bucket, lastUpdated],
-    queryFn: () => dataProvider.getLeadsTrend(trendRange, 'weekly', bucket),
+    queryKey: ['leads-trend', trendRange, bucket, lastUpdated, leadType],
+    queryFn: () => dataProvider.getLeadsTrend(trendRange, 'weekly', bucket, leadType),
     staleTime: 30000
   });
 
   const { data: stageDistro } = useQuery({
-    queryKey: ['leads-stage', pieRange, lastUpdated],
-    queryFn: () => dataProvider.getStageDistribution(pieRange),
+    queryKey: ['leads-stage', pieRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getStageDistribution(pieRange, undefined, leadType),
     staleTime: 30000
   });
 
@@ -281,7 +335,7 @@ const LeadsExplorerPage: React.FC = () => {
       return [{ name: 'Converted', value: 100, color: COLORS.Converted }];
     }
 
-    if (bucket === 'Pending') {
+    if (bucket === 'Pending' || bucket === 'DemoBooked' || bucket === 'Callback') {
       const hotCount = source.filter(l => l.sentiment === 'Hot').length;
       const warmCount = source.filter(l => l.sentiment === 'Warm').length;
       const coldCount = source.filter(l => l.sentiment === 'Cold').length;
@@ -311,6 +365,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Converted') return ['converted'];
     if (bucket === 'Lost') return ['hot', 'warm', 'cold'];
     if (bucket === 'Pending') return ['hot', 'warm', 'cold'];
+    if (bucket === 'DemoBooked' || bucket === 'Callback') return ['hot', 'warm', 'cold'];
     return ['hot', 'warm', 'cold', 'converted', 'lost'];
   }, [bucket]);
 
@@ -362,39 +417,97 @@ const LeadsExplorerPage: React.FC = () => {
   };
 
   const downloadCSV = (data: LeadInsightRow[], filename: string) => {
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + "Name,Phone,Status,Sentiment,Summary\n"
-      + data.map(l => `${l['User Name']},${l['Phone Number']},${l.status},${l.sentiment},"${l.concern}"`).join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `${filename}.csv`);
+    const escape = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
+    const headers = ['ID', 'Name', 'Phone', 'Status', 'Sentiment', 'Lead Type', 'Duration (s)', 'Call Date', 'Summary', 'Objection'];
+    const rows = data.map(l => [
+      l.id, l['User Name'], l['Phone Number'], l.status, l.sentiment,
+      l.lead_type || '', l.duration || '',
+      l.CallTimestamp ? (() => { try { return format(new Date(l.CallTimestamp!), 'yyyy-MM-dd HH:mm'); } catch { return ''; } })() : '',
+      l.concern, l['Conversation Summary']
+    ].map(escape).join(','));
+    const csvContent = [headers.map(escape).join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `${filename}.csv`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    toast.success(`Export successful.`);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${data.length} leads`);
     setIsExportOpen(false);
   };
 
-  const handleExportAction = async (type: 'all' | 'hot' | 'warm' | 'cold' | 'selection' | 'current') => {
+  const downloadTranscripts = (data: LeadInsightRow[], filename: string) => {
+    const content = data.map(l => {
+      const dateStr = l.CallTimestamp ? (() => { try { return format(new Date(l.CallTimestamp!), 'MMM dd yyyy, hh:mm a'); } catch { return ''; } })() : 'N/A';
+      const dur = l.duration ? `${Math.floor(Number(l.duration)/60)}m ${Number(l.duration)%60}s` : 'N/A';
+      return [
+        `====================================================`,
+        `LEAD: ${l['User Name']} | Phone: ${l['Phone Number']}`,
+        `Date: ${dateStr} | Duration: ${dur} | Sentiment: ${l.sentiment}`,
+        `====================================================`,
+        `SUMMARY:`,
+        l['Conversation Summary'] || 'No summary.',
+        ``,
+        `OBJECTION:`,
+        l.concern || 'None.',
+        ``,
+      ].join('\n');
+    }).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `${filename}.txt`;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Transcripts downloaded (${data.length} leads)`);
+    setIsExportOpen(false);
+  };
+
+  const handleExportAction = async (type: 'all' | 'hot' | 'warm' | 'cold' | 'selection' | 'current' | 'transcripts_selection' | 'transcripts_all') => {
+    const today = format(new Date(), 'yyyy-MM-dd');
     if (type === 'selection') {
-      downloadCSV(leads?.filter(l => selectedIds.includes(l.id)) || [], `particular_selection`);
+      const selected = selectedIds.map(id => selectedLeadsCache[id]).filter(Boolean);
+      downloadCSV(selected.length ? selected : (leads?.filter(l => selectedIds.includes(l.id)) || []), `selected_leads_${today}`);
+    } else if (type === 'transcripts_selection') {
+      const selected = selectedIds.map(id => selectedLeadsCache[id]).filter(Boolean);
+      downloadTranscripts(selected.length ? selected : (leads?.filter(l => selectedIds.includes(l.id)) || []), `transcripts_selected_${today}`);
+    } else if (type === 'transcripts_all') {
+      downloadTranscripts(leads || [], `transcripts_${bucket}_${today}`);
     } else if (type === 'all') {
       const all = await dataProvider.getLeads({ range: { from: '2000-01-01', to: '2100-01-01' }, bucket: 'all' });
-      downloadCSV(all, `all_leads`);
+      downloadCSV(all, `all_leads_${today}`);
     } else if (['hot', 'warm', 'cold'].includes(type)) {
       const segment = await dataProvider.getLeads({ range, bucket: type.charAt(0).toUpperCase() + type.slice(1) });
-      downloadCSV(segment, `segment_${type}`);
+      downloadCSV(segment, `${type}_leads_${today}`);
     } else {
-      downloadCSV(leads || [], `filtered_view`);
+      downloadCSV(leads || [], `${bucket}_leads_${today}`);
     }
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === (leads?.length || 0)) setSelectedIds([]);
-    else setSelectedIds(leads?.map(l => l.id) || []);
+  const toggleSelectLead = (lead: LeadInsightRow) => {
+    const id = lead.id;
+    setSelectedLeadsCache(prev => ({ ...prev, [id]: lead }));
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === (leads?.length || 0) && leads?.every(l => selectedIds.includes(l.id))) {
+      setSelectedIds([]);
+    } else {
+      const newCache: Record<string, LeadInsightRow> = { ...selectedLeadsCache };
+      leads?.forEach(l => { newCache[l.id] = l; });
+      setSelectedLeadsCache(newCache);
+      setSelectedIds(leads?.map(l => l.id) || []);
+    }
+  };
+
+  const clearSelection = () => { setSelectedIds([]); setSelectedLeadsCache({}); };
 
   const pieSubtitle = useMemo(() => {
     if (bucket === 'Lost') return 'Sentiment of lost leads';
     if (bucket === 'Pending') return 'Sentiment of pending leads';
+    if (bucket === 'DemoBooked') return 'Sentiment of demo-booked leads';
+    if (bucket === 'Callback') return 'Sentiment of callback leads';
     if (['Hot', 'Warm', 'Cold', 'Converted'].includes(bucket)) return `${bucket} leads only`;
     return 'Lead distribution';
   }, [bucket]);
@@ -416,6 +529,7 @@ const LeadsExplorerPage: React.FC = () => {
           <div className="flex bg-white/[0.03] p-1 rounded-xl border border-white/[0.06]">
             <button onClick={() => updateURL({ tab: 'overview' })} className={cn("px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all cursor-pointer", activeTab === 'overview' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}><LayoutDashboard size={15} /> Overview</button>
             <button onClick={() => updateURL({ tab: 'table' })} className={cn("px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all cursor-pointer", activeTab === 'table' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}><TableIcon size={15} /> Table</button>
+            <button onClick={() => updateURL({ tab: 'outcomes' })} className={cn("px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all cursor-pointer", activeTab === 'outcomes' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}><ListChecks size={15} /> Outcomes</button>
           </div>
           <div className="relative" ref={exportRef}>
             <Button variant="outline" size="sm" onClick={() => setIsExportOpen(!isExportOpen)} className="h-9 px-4 flex items-center gap-2 rounded-xl cursor-pointer">
@@ -427,15 +541,27 @@ const LeadsExplorerPage: React.FC = () => {
                   className="absolute right-0 mt-2 w-52 bg-card/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] z-[100] overflow-hidden p-1.5 space-y-0.5">
                   {selectedIds.length > 0 && (
                     <>
-                      <button onClick={() => handleExportAction('selection')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent flex items-center justify-between cursor-pointer" style={{ color: 'var(--brand-600)' }}><span>Selected</span><Badge variant="teal">{selectedIds.length}</Badge></button>
+                      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        {selectedIds.length} selected (across all categories)
+                      </p>
+                      <button onClick={() => handleExportAction('selection')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent flex items-center justify-between cursor-pointer" style={{ color: 'var(--brand-600)' }}>
+                        <span>Export Selected (CSV)</span><Badge variant="teal">{selectedIds.length}</Badge>
+                      </button>
+                      <button onClick={() => handleExportAction('transcripts_selection')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent flex items-center justify-between cursor-pointer text-purple-500">
+                        <span>Download Transcripts</span><Badge variant="zinc">{selectedIds.length}</Badge>
+                      </button>
+                      <button onClick={clearSelection} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-rose-400 cursor-pointer">Clear Selection</button>
                       <div className="h-px bg-border mx-2 my-1" />
                     </>
                   )}
+                  <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Export CSV</p>
                   <button onClick={() => handleExportAction('all')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-foreground/70 transition-colors cursor-pointer">Full Database</button>
+                  <button onClick={() => handleExportAction('hot')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-rose-500 transition-colors cursor-pointer">Hot Leads</button>
+                  <button onClick={() => handleExportAction('warm')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-amber-500 transition-colors cursor-pointer">Warm Leads</button>
+                  <button onClick={() => handleExportAction('cold')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-blue-500 transition-colors cursor-pointer">Cold Leads</button>
                   <div className="h-px bg-border mx-2 my-1" />
-                  <button onClick={() => handleExportAction('hot')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-rose-500 transition-colors cursor-pointer">Hot Segment</button>
-                  <button onClick={() => handleExportAction('warm')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-amber-500 transition-colors cursor-pointer">Warm Segment</button>
-                  <button onClick={() => handleExportAction('cold')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-blue-500 transition-colors cursor-pointer">Cold Segment</button>
+                  <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Transcripts</p>
+                  <button onClick={() => handleExportAction('transcripts_all')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-purple-500 transition-colors cursor-pointer">Current View Transcripts</button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -459,6 +585,28 @@ const LeadsExplorerPage: React.FC = () => {
           </motion.button>
         ))}
       </div>
+
+      {/* Floating cross-category selection bar */}
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl bg-card border border-primary/30 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+          >
+            <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
+              <CheckCircle2 size={14} className="text-primary" />
+            </div>
+            <span className="text-sm font-bold text-foreground">{selectedIds.length} lead{selectedIds.length > 1 ? 's' : ''} selected</span>
+            <span className="text-xs text-muted-foreground">(across all categories)</span>
+            <div className="w-px h-5 bg-border mx-1" />
+            <button onClick={() => handleExportAction('selection')} className="text-xs font-semibold text-primary hover:underline cursor-pointer">Export CSV</button>
+            <button onClick={() => handleExportAction('transcripts_selection')} className="text-xs font-semibold text-purple-500 hover:underline cursor-pointer">Transcripts</button>
+            <button onClick={clearSelection} className="text-xs font-semibold text-rose-400 hover:underline cursor-pointer">Clear</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Content */}
       <AnimatePresence mode="wait">
@@ -608,11 +756,13 @@ const LeadsExplorerPage: React.FC = () => {
             </div>
 
             {/* Quick Stats Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               {[
                 { label: 'Hot', count: kpis?.bucketCounts?.['Hot'] || 0, color: COLORS.Hot, bucket: 'Hot' },
                 { label: 'Warm', count: kpis?.bucketCounts?.['Warm'] || 0, color: COLORS.Warm, bucket: 'Warm' },
                 { label: 'Cold', count: kpis?.bucketCounts?.['Cold'] || 0, color: COLORS.Cold, bucket: 'Cold' },
+                { label: 'Demo Booked', count: kpis?.bucketCounts?.['DemoBooked'] || 0, color: COLORS.DemoBooked, bucket: 'DemoBooked' },
+                { label: 'Callback', count: kpis?.bucketCounts?.['Callback'] || 0, color: COLORS.Callback, bucket: 'Callback' },
                 { label: 'Converted', count: kpis?.bucketCounts?.['Converted'] || 0, color: COLORS.Converted, bucket: 'Converted' },
                 { label: 'Lost', count: kpis?.bucketCounts?.['Lost'] || 0, color: COLORS.Lost, bucket: 'Lost' },
                 { label: 'Pending', count: kpis?.bucketCounts?.['Pending'] || 0, color: COLORS.Pending, bucket: 'Pending' },
@@ -633,7 +783,7 @@ const LeadsExplorerPage: React.FC = () => {
               ))}
             </div>
           </motion.div>
-        ) : (
+        ) : activeTab === 'table' ? (
           /* ── Table Tab ── */
           <motion.div key="table" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
             <div className="flex items-center gap-4">
@@ -656,14 +806,29 @@ const LeadsExplorerPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-white/[0.04]">
                     {leadsLoading ? [...Array(5)].map((_, i) => <tr key={i}><td colSpan={5} className="p-4"><Skeleton className="h-12 w-full rounded-xl" /></td></tr>) : leads?.map((lead) => {
-                      const showActionBtns = ['Hot', 'Warm', 'Cold'].includes(bucket);
+                      const rawStatus = String((lead as any).status || (lead as any)['lead stage'] || '').toLowerCase().trim();
+                      const isConverted = ['crm_converted', 'converted'].includes(rawStatus);
+                      const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
+                      const isFinalized = isConverted || isLost;
                       const isSelected = selectedIds.includes(lead.id);
                       return (
                         <tr key={lead.id} className={cn("group transition-colors cursor-pointer", isSelected ? "bg-primary/5" : "hover:bg-white/[0.02]")} onClick={() => navigate(`/leads/${lead.id}`)}>
-                          <td className="p-4 text-center cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedIds(prev => prev.includes(lead.id) ? prev.filter(i => i !== lead.id) : [...prev, lead.id]); }}>
+                          <td className="p-4 text-center cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleSelectLead(lead); }}>
                             <div className="text-muted-foreground hover:text-foreground mx-auto flex items-center justify-center">{isSelected ? <CheckCircle2 size={16} className="text-primary" /> : <Circle size={16} />}</div>
                           </td>
-                          <td className="px-4 py-4"><Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'default'} className="font-medium text-xs">{lead.scoring.bucket}</Badge></td>
+                          <td className="px-4 py-4">
+                            {isConverted ? (
+                              <Badge variant="teal" className="font-medium text-xs">Converted</Badge>
+                            ) : isLost ? (
+                              <Badge variant="zinc" className="font-medium text-xs">Lost</Badge>
+                            ) : rawStatus === 'demo_booked' ? (
+                              <Badge variant="default" className="font-medium text-xs bg-violet-500/15 text-violet-400 border-violet-500/20">Demo Booked</Badge>
+                            ) : rawStatus === 'call_back' || rawStatus === 'callback' ? (
+                              <Badge variant="default" className="font-medium text-xs bg-orange-500/15 text-orange-400 border-orange-500/20">Callback</Badge>
+                            ) : (
+                              <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'default'} className="font-medium text-xs">{lead.scoring.bucket}</Badge>
+                            )}
+                          </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-semibold text-xs bg-gradient-to-br from-primary to-primary/70 shadow-[0_4px_12px_rgba(var(--brand-rgb),0.3)]">{lead['User Name']?.[0]}</div>
@@ -676,10 +841,10 @@ const LeadsExplorerPage: React.FC = () => {
                           <td className="px-4 py-4 max-w-[300px]"><p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p></td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {showActionBtns && (
+                              {!isFinalized && (
                                 <>
-                                  <button onClick={(e) => { e.stopPropagation(); setWorkflowModal({ isOpen: true, lead, type: 'Converted' }); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors cursor-pointer"><CheckCircle2 size={16} /></button>
-                                  <button onClick={(e) => { e.stopPropagation(); setWorkflowModal({ isOpen: true, lead, type: 'NotInterested' }); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer"><X size={16} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); setWorkflowModal({ isOpen: true, lead, type: 'Converted' }); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors cursor-pointer" title="Mark as Converted"><CheckCircle2 size={16} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); setWorkflowModal({ isOpen: true, lead, type: 'NotInterested' }); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer" title="Mark as Lost"><X size={16} /></button>
                                 </>
                               )}
                               <ChevronRight size={16} className="ml-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -693,7 +858,122 @@ const LeadsExplorerPage: React.FC = () => {
               </div>
             </Card>
           </motion.div>
-        )}
+        ) : activeTab === 'outcomes' ? (
+          /* ── Outcomes Tab ── */
+          <motion.div key="outcomes" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+            {/* Filter + Search bar */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input type="text" placeholder="Search by name, phone, reason..." value={outcomeSearch}
+                  onChange={(e) => setOutcomeSearch(e.target.value)}
+                  className="w-full bg-card border border-white/[0.06] rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all" />
+              </div>
+              <div className="flex gap-2">
+                {(['all', 'Converted', 'Lost'] as const).map(f => (
+                  <button key={f} onClick={() => setOutcomeFilter(f)}
+                    className={cn("px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer",
+                      outcomeFilter === f
+                        ? f === 'Converted' ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                          : f === 'Lost' ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                          : "bg-primary/15 border-primary/30 text-primary"
+                        : "bg-card border-white/[0.06] text-muted-foreground hover:text-foreground")}>
+                    {f === 'all' ? 'All' : f}
+                    {f !== 'all' && <span className="ml-1.5 text-xs opacity-70">{outcomes?.filter((o: LeadOutcome) => o.outcome === f).length || 0}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Card className="overflow-hidden rounded-2xl border-white/[0.06]">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-white/[0.04] text-xs font-medium text-muted-foreground bg-white/[0.02]">
+                      <th className="px-4 py-3.5">Outcome</th>
+                      <th className="px-4 py-3.5">Lead</th>
+                      <th className="px-4 py-3.5">Reason</th>
+                      <th className="px-4 py-3.5">Note</th>
+                      <th className="px-4 py-3.5">Date</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {outcomesLoading
+                      ? [...Array(4)].map((_, i) => <tr key={i}><td colSpan={6} className="p-4"><Skeleton className="h-10 w-full rounded-xl" /></td></tr>)
+                      : filteredOutcomes.length === 0
+                        ? <tr><td colSpan={6} className="py-16 text-center text-sm text-muted-foreground">No outcomes recorded yet.</td></tr>
+                        : filteredOutcomes.map((o: LeadOutcome) => (
+                          <tr key={o.id} className="group hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-4">
+                              {o.outcome === 'Converted'
+                                ? <Badge variant="teal" className="flex items-center gap-1.5 w-fit"><CheckCircle size={11} /> Converted</Badge>
+                                : <Badge variant="danger" className="flex items-center gap-1.5 w-fit"><XCircle size={11} /> Lost</Badge>}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold",
+                                  o.outcome === 'Converted' ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400")}>
+                                  {o.lead_name?.[0] || '?'}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">{o.lead_name}</p>
+                                  <p className="text-xs text-muted-foreground">{o.phone_number}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 max-w-[180px]"><p className="text-xs text-muted-foreground truncate">{o.reason || '—'}</p></td>
+                            <td className="px-4 py-4 max-w-[200px]"><p className="text-xs text-muted-foreground line-clamp-2">{o.note || '—'}</p></td>
+                            <td className="px-4 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                              {o.outcome_date ? (() => { try { return format(new Date(o.outcome_date), 'MMM dd, yyyy'); } catch { return o.outcome_date; } })() : '—'}
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => { setEditingOutcome(o); setEditForm({ reason: o.reason || '', note: o.note || '' }); }}
+                                  className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors cursor-pointer" title="Edit">
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => { if (confirm(`Delete this ${o.outcome} record for ${o.lead_name}? The lead status will be reverted.`)) deleteOutcomeMutation.mutate(o.id); }}
+                                  className="p-1.5 rounded-lg hover:bg-rose-500/10 hover:text-rose-500 text-muted-foreground transition-colors cursor-pointer" title="Delete">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Edit Modal */}
+            {editingOutcome && (
+              <Modal isOpen={true} onClose={() => setEditingOutcome(null)} title={`Edit ${editingOutcome.outcome} — ${editingOutcome.lead_name}`}>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Reason</label>
+                    <input value={editForm.reason} onChange={e => setEditForm(f => ({ ...f, reason: e.target.value }))}
+                      className="w-full bg-secondary border border-border rounded-2xl p-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Note</label>
+                    <textarea value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} rows={4}
+                      className="w-full bg-secondary border border-border rounded-2xl p-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button variant="primary" className="flex-1 rounded-2xl"
+                      loading={updateOutcomeMutation.isPending}
+                      onClick={() => updateOutcomeMutation.mutate({ id: editingOutcome.id, updates: editForm })}>
+                      Save Changes
+                    </Button>
+                    <Button variant="ghost" className="flex-1 rounded-2xl" onClick={() => setEditingOutcome(null)}>Cancel</Button>
+                  </div>
+                </div>
+              </Modal>
+            )}
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
       {drilldown.isOpen && (

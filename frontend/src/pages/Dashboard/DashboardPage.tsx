@@ -159,15 +159,23 @@ const ChartEmptyState = () => (
 
 /* ─── KPI Cards ─── */
 const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undefined, handleStatClick: (b?: string) => void }) => (
-  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-    <StatCard label="Total Leads" value={kpis?.totalLeads ?? 0} icon={Users} variant="teal" onClick={() => handleStatClick('all')} />
-    <StatCard label="Hot" value={kpis?.hotLeads ?? 0} icon={Flame} variant="orange" onClick={() => handleStatClick('Hot')} />
-    <StatCard label="Warm" value={kpis?.warmLeads ?? 0} icon={Zap} variant="purple" onClick={() => handleStatClick('Warm')} />
-    <StatCard label="Cold" value={kpis?.coldLeads ?? 0} icon={Activity} variant="blue" onClick={() => handleStatClick('Cold')} />
-    <StatCard label="Converted" value={kpis?.converted ?? 0} icon={CheckCircle2} variant="teal" onClick={() => handleStatClick('Converted')} />
-    <StatCard label="Lost" value={kpis?.unconverted ?? 0} icon={XCircle} variant="danger" onClick={() => handleStatClick('Lost')} />
-    <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
-    <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" />
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+      <StatCard label="Total Leads" value={kpis?.totalLeads ?? 0} icon={Users} variant="teal" onClick={() => handleStatClick('all')} />
+      <StatCard label="Hot" value={kpis?.hotLeads ?? 0} icon={Flame} variant="orange" onClick={() => handleStatClick('Hot')} />
+      <StatCard label="Warm" value={kpis?.warmLeads ?? 0} icon={Zap} variant="purple" onClick={() => handleStatClick('Warm')} />
+      <StatCard label="Cold" value={kpis?.coldLeads ?? 0} icon={Activity} variant="blue" onClick={() => handleStatClick('Cold')} />
+      <StatCard label="Converted" value={kpis?.converted ?? 0} icon={CheckCircle2} variant="teal" onClick={() => handleStatClick('Converted')} />
+      <StatCard label="Lost" value={kpis?.unconverted ?? 0} icon={XCircle} variant="danger" onClick={() => handleStatClick('Lost')} />
+      <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
+      <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" onClick={() => handleStatClick('Hot')} />
+    </div>
+    {((kpis?.demoBooked ?? 0) > 0 || (kpis?.callbacks ?? 0) > 0) && (
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard label="Demo Booked" value={kpis?.demoBooked ?? 0} icon={Radio} variant="purple" onClick={() => handleStatClick('DemoBooked')} />
+        <StatCard label="Callbacks" value={kpis?.callbacks ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Callback')} />
+      </div>
+    )}
   </div>
 ));
 
@@ -223,7 +231,7 @@ const RecentActivityTable = React.memo(({ recentLeads, navigate }: { recentLeads
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
-  const { dateRange, datePreset, lastUpdated } = useGlobalFilters();
+  const { dateRange, datePreset, lastUpdated, leadType } = useGlobalFilters();
 
   // Per-graph timeframe filters
   const [trendTimeframe, setTrendTimeframe] = useState('global');
@@ -243,44 +251,44 @@ const DashboardPage: React.FC = () => {
 
   /* ─── Data Queries ─── */
   const { data: kpis, isLoading: kpisLoading } = useQuery<KPIStats>({
-    queryKey: ['dashboard-kpis', dateRange, lastUpdated],
-    queryFn: () => dataProvider.getDashboardKPIs(dateRange),
+    queryKey: ['dashboard-kpis', dateRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getDashboardKPIs(dateRange, leadType),
     staleTime: 30000
   });
 
   const { data: trendData } = useQuery<TrendPoint[]>({
-    queryKey: ['dashboard-trend', trendRange, lastUpdated],
-    queryFn: () => dataProvider.getLeadsTrend(trendRange, datePreset),
+    queryKey: ['dashboard-trend', trendRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getLeadsTrend(trendRange, datePreset, undefined, leadType),
     staleTime: 30000
   });
 
   const { data: stageDistro } = useQuery<StagePoint[]>({
-    queryKey: ['dashboard-stage', pieRange, lastUpdated],
-    queryFn: () => dataProvider.getStageDistribution(pieRange),
+    queryKey: ['dashboard-stage', pieRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getStageDistribution(pieRange, undefined, leadType),
     staleTime: 30000
   });
 
   const { data: pieKpis } = useQuery<KPIStats>({
-    queryKey: ['dashboard-pie-kpis', pieRange, lastUpdated],
-    queryFn: () => dataProvider.getDashboardKPIs(pieRange),
+    queryKey: ['dashboard-pie-kpis', pieRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getDashboardKPIs(pieRange, leadType),
     staleTime: 30000
   });
 
   const { data: callTrend } = useQuery<VoiceTrendPoint[]>({
-    queryKey: ['dashboard-call-trend', volumeRange, lastUpdated],
-    queryFn: () => dataProvider.getVoiceTrend(volumeRange, datePreset),
+    queryKey: ['dashboard-call-trend', volumeRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getVoiceTrend(volumeRange, datePreset, leadType),
     staleTime: 30000
   });
 
   const { data: recentLeads } = useQuery({
-    queryKey: ['recent-leads', lastUpdated],
-    queryFn: () => dataProvider.getLeads({ range: dateRange, limit: 5 }),
+    queryKey: ['recent-leads', lastUpdated, leadType],
+    queryFn: () => dataProvider.getLeads({ range: dateRange, limit: 5, leadType }),
     staleTime: 30000
   });
 
   const { data: allLeads } = useQuery({
-    queryKey: ['all-leads-dashboard', dateRange, lastUpdated],
-    queryFn: () => dataProvider.getLeads({ range: dateRange, bucket: 'all' }),
+    queryKey: ['all-leads-dashboard', dateRange, lastUpdated, leadType],
+    queryFn: () => dataProvider.getLeads({ range: dateRange, bucket: 'all', leadType }),
     staleTime: 30000
   });
 

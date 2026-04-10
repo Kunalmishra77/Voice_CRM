@@ -88,7 +88,7 @@ export class MockProvider implements IDataProvider {
     }, 150));
   }
 
-  async getLeadsTrend(range: DateRange, preset: DatePreset, bucketFilter?: string): Promise<TrendPoint[]> {
+  async getLeadsTrend(range: DateRange, preset: DatePreset, bucketFilter?: string, _leadType?: string): Promise<TrendPoint[]> {
     return new Promise(resolve => setTimeout(() => {
       let calls = selectors.filterByDateRange(mockCalls, range);
       if (bucketFilter && bucketFilter !== 'all') {
@@ -98,7 +98,7 @@ export class MockProvider implements IDataProvider {
     }, 100));
   }
 
-  async getStageDistribution(range: DateRange, bucketFilter?: string): Promise<StagePoint[]> {
+  async getStageDistribution(range: DateRange, bucketFilter?: string, _leadType?: string): Promise<StagePoint[]> {
     return new Promise(resolve => setTimeout(() => {
       let leads = selectors.filterByDateRange(getLeadsArray(), range);
       if (bucketFilter && bucketFilter !== 'all') {
@@ -128,7 +128,7 @@ export class MockProvider implements IDataProvider {
     }, 100));
   }
 
-  async getFunnel(range: DateRange, bucketFilter?: string): Promise<FunnelStep[]> {
+  async getFunnel(range: DateRange, bucketFilter?: string, _leadType?: string): Promise<FunnelStep[]> {
     return new Promise(resolve => setTimeout(() => {
       let leads = selectors.filterByDateRange(getLeadsArray(), range);
       if (bucketFilter && bucketFilter !== 'all') {
@@ -175,7 +175,7 @@ export class MockProvider implements IDataProvider {
     }, 100));
   }
 
-  async getVoiceTrend(range: DateRange, preset: DatePreset): Promise<VoiceTrendPoint[]> {
+  async getVoiceTrend(range: DateRange, preset: DatePreset, _leadType?: string): Promise<VoiceTrendPoint[]> {
     return new Promise(resolve => setTimeout(() => {
       const calls = selectors.filterByDateRange(mockCalls, range);
       const map = new Map<string, any>();
@@ -236,7 +236,7 @@ export class MockProvider implements IDataProvider {
     }, 100));
   }
 
-  async getLeadInsightsSummary(range: DateRange): Promise<LeadInsightsSummary> {
+  async getLeadInsightsSummary(range: DateRange, _leadType?: string): Promise<LeadInsightsSummary> {
     return new Promise(resolve => setTimeout(() => {
       const leads = selectors.filterByDateRange(getLeadsArray(), range);
       
@@ -259,7 +259,10 @@ export class MockProvider implements IDataProvider {
 
       const highIntentLeads = leads.filter(l => l.bucket === 'Hot' || l.best_score > 80).sort((a,b) => b.best_score - a.best_score).slice(0, 10).map(mapLeadToRow);
 
-      resolve({ sentimentTrend, topConcerns, highIntentLeads });
+      const hotCount  = leads.filter((l: any) => l.bucket === 'Hot').length;
+      const warmCount = leads.filter((l: any) => l.bucket === 'Warm').length;
+      const coldCount = leads.filter((l: any) => l.bucket === 'Cold').length;
+      resolve({ totalLeads: leads.length, hotCount, warmCount, coldCount, avgDuration: 0, sentimentTrend, topConcerns, highIntentLeads });
     }, 100));
   }
 
@@ -392,4 +395,8 @@ export class MockProvider implements IDataProvider {
   async getEmployees(): Promise<any[]> { return []; }
   async getTaskStats(_filters?: Record<string, any>): Promise<any> { return { total: 0, pending: 0, overdue: 0, completed: 0, byEmployee: {} }; }
   async getLiveCallActivity(): Promise<any> { return { summary: { total_today: 0, queued: 0, calling: 0, completed: 0, failed: 0 }, active_calls: [], recent_completed: [], recent_failed: [], last_updated: new Date().toISOString() }; }
+  async getOutcomes(_filters?: Record<string, any>): Promise<any[]> { return []; }
+  async getOutcomesTrend(_filters?: Record<string, any>): Promise<any[]> { return []; }
+  async updateOutcome(_id: string, _updates: any): Promise<boolean> { return true; }
+  async deleteOutcome(_id: string): Promise<boolean> { return true; }
 }

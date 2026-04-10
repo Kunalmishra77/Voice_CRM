@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Zap,
   PhoneCall,
+  PhoneMissed,
   Mic,
   ShieldCheck,
   Target,
@@ -21,7 +22,8 @@ import {
   CheckCircle,
   Headphones,
   Play,
-  Volume2
+  Volume2,
+  Download
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -96,6 +98,14 @@ const LeadDetailPage: React.FC = () => {
     );
   }
 
+  const rawStatus = String((lead as any).status || (lead as any)['lead stage'] || '').toLowerCase().trim();
+  const isConverted = ['crm_converted', 'converted'].includes(rawStatus);
+  const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
+  const isDemoBooked = rawStatus === 'demo_booked';
+  const isCallback = rawStatus === 'call_back' || rawStatus === 'callback';
+  const isMissed = rawStatus === 'failed';
+  const isFinalized = isConverted || isLost;
+
   return (
     <PageShell>
       <div className="flex items-center gap-4 mb-2">
@@ -110,14 +120,80 @@ const LeadDetailPage: React.FC = () => {
           <p className="text-muted-foreground font-medium mt-1">Lead details for {lead['Phone Number']}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'NotInterested' })} className="rounded-2xl px-6 h-11 border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
-            <X size={14} className="mr-2" /> Mark as Lost
-          </Button>
-          <Button variant="primary" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'Converted' })} className="rounded-2xl px-6 h-11 shadow-sm bg-emerald-500 border-emerald-500 hover:bg-emerald-600">
-            <CheckCircle size={14} className="mr-2" /> Mark as Converted
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => navigate(`/calls?sessionId=${lead.id}`)} className="rounded-2xl px-6 h-11">
-            <PhoneCall size={14} className="mr-2" /> View Transcript
+          {isConverted && (
+            <div className="flex items-center gap-2 px-5 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-semibold text-sm">
+              <CheckCircle size={15} /> Converted
+            </div>
+          )}
+          {isLost && (
+            <div className="flex items-center gap-2 px-5 h-11 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 font-semibold text-sm">
+              <X size={15} /> Lost
+            </div>
+          )}
+          {isDemoBooked && (
+            <div className="flex items-center gap-2 px-5 h-11 rounded-2xl bg-violet-500/10 border border-violet-500/30 text-violet-400 font-semibold text-sm">
+              <PhoneCall size={15} /> Demo Booked
+            </div>
+          )}
+          {isCallback && (
+            <div className="flex items-center gap-2 px-5 h-11 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-orange-400 font-semibold text-sm">
+              <PhoneCall size={15} /> Callback Requested
+            </div>
+          )}
+          {isMissed && (
+            <div className="flex items-center gap-2 px-5 h-11 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold text-sm">
+              <PhoneMissed size={15} /> Missed Call
+            </div>
+          )}
+          {!isFinalized && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'NotInterested' })} className="rounded-2xl px-6 h-11 border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-all">
+                <X size={14} className="mr-2" /> Mark as Lost
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setWorkflowModal({ isOpen: true, lead, type: 'Converted' })} className="rounded-2xl px-6 h-11 shadow-sm bg-emerald-500 border-emerald-500 hover:bg-emerald-600">
+                <CheckCircle size={14} className="mr-2" /> Mark as Converted
+              </Button>
+            </>
+          )}
+          <Button variant="secondary" size="sm" onClick={() => {
+            // Download call transcript as a .txt file
+            const callDate = lead.CallTimestamp || lead.created_at || '';
+            const dateStr = callDate ? (() => { try { return format(new Date(callDate), 'MMM dd yyyy, hh:mm a'); } catch { return ''; } })() : '';
+            const safeName = lead['User Name']?.replace(/[^a-zA-Z0-9]/g, '_') || 'Lead';
+            const content = [
+              `CALL TRANSCRIPT`,
+              `=====================================`,
+              `Name:      ${lead['User Name']}`,
+              `Phone:     ${lead['Phone Number']}`,
+              `Date:      ${dateStr}`,
+              `Duration:  ${lead.duration ? `${Math.floor(Number(lead.duration)/60)}m ${Number(lead.duration)%60}s` : 'N/A'}`,
+              `Sentiment: ${lead.sentiment}`,
+              `Status:    ${lead.status || lead['lead stage']}`,
+              `Lead Type: ${lead.lead_type || 'N/A'}`,
+              `=====================================`,
+              ``,
+              `SUMMARY`,
+              `-------`,
+              lead['Conversation Summary'] || 'No summary available.',
+              ``,
+              `PRIMARY OBJECTION`,
+              `-----------------`,
+              lead.concern || 'None recorded.',
+              ``,
+              `RECOMMENDED ACTION`,
+              `------------------`,
+              lead['Action to be taken'] || 'None recorded.',
+            ].join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${safeName}_transcript_${callDate ? format(new Date(callDate), 'yyyy-MM-dd') : 'unknown'}.txt`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast.success('Transcript downloaded');
+          }} className="rounded-2xl px-6 h-11">
+            <Download size={14} className="mr-2" /> Download Transcript
           </Button>
         </div>
       </div>
@@ -179,28 +255,81 @@ const LeadDetailPage: React.FC = () => {
 
           {/* Call Recording Player */}
           <SectionCard title="Call Recording" subtitle="Listen to the voice recording." icon={<Headphones size={16} style={{ color: 'var(--brand-500)' }} />}>
-            {lead.recording_url ? (
-              <div className="py-4 space-y-4">
-                <div className="flex items-center gap-3 p-4 rounded-2xl bg-secondary border border-border">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--brand-100)' }}>
-                    <Volume2 size={18} style={{ color: 'var(--brand-600)' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground mb-2">Voice Recording</p>
-                    <audio
-                      controls
-                      controlsList="nodownload"
-                      preload="metadata"
-                      className="w-full h-10 rounded-lg"
-                      style={{ maxWidth: '100%' }}
+            {lead.recording_url ? (() => {
+              const callDate = (() => {
+                try {
+                  const ts = lead.CallTimestamp || lead.created_at;
+                  if (!ts) return null;
+                  const d = new Date(ts);
+                  return isNaN(d.getTime()) ? null : d;
+                } catch { return null; }
+              })();
+              const dateLabel = callDate ? format(callDate, 'MMM dd, yyyy') : null;
+              const timeLabel = callDate ? format(callDate, 'hh:mm a') : null;
+              const safeFileName = `${lead['User Name'].replace(/[^a-zA-Z0-9]/g, '_')}_${callDate ? format(callDate, 'yyyy-MM-dd_HH-mm') : 'recording'}.mp3`;
+
+              const handleDownload = () => {
+                // Use backend proxy to avoid CORS — server fetches and streams as attachment
+                const BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3010/api';
+                const API_KEY = (import.meta.env.VITE_API_KEY as string) || 'dev_key_2026';
+                const proxyUrl = `${BASE}/recordings/download?url=${encodeURIComponent(lead.recording_url!)}&filename=${encodeURIComponent(safeFileName)}&x-api-key=${API_KEY}`;
+                const a = document.createElement('a');
+                a.href = proxyUrl;
+                a.download = safeFileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                toast.success(`Downloading: ${safeFileName}`);
+              };
+
+              return (
+                <div className="py-4 space-y-4">
+                  {/* Meta row: date + time + download */}
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-3">
+                      {dateLabel && (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <Calendar size={12} className="text-primary" />
+                          {dateLabel}
+                        </div>
+                      )}
+                      {timeLabel && (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <Activity size={12} className="text-primary" />
+                          {timeLabel}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleDownload}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all"
                     >
-                      <source src={lead.recording_url} />
-                      Your browser does not support audio playback.
-                    </audio>
+                      <Download size={11} /> Download
+                    </button>
+                  </div>
+
+                  {/* Player */}
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-secondary border border-border">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--brand-100)' }}>
+                      <Volume2 size={18} style={{ color: 'var(--brand-600)' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 truncate">{safeFileName}</p>
+                      <audio
+                        controls
+                        controlsList="nodownload"
+                        preload="metadata"
+                        className="w-full h-10 rounded-lg"
+                        style={{ maxWidth: '100%' }}
+                      >
+                        <source src={lead.recording_url} />
+                        Your browser does not support audio playback.
+                      </audio>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               <div className="py-8 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-3">
                   <Headphones size={20} className="text-muted-foreground" />
@@ -223,8 +352,10 @@ const LeadDetailPage: React.FC = () => {
                             {(() => {
                                try {
                                   if (!call.lastTimestamp) return 'N/A';
-                                  const date = parseISO(call.lastTimestamp);
-                                  return isNaN(date.getTime()) ? 'N/A' : format(date, 'MMM dd');
+                                  // Try ISO parse first, then Date constructor as fallback
+                                  let date = parseISO(call.lastTimestamp);
+                                  if (isNaN(date.getTime())) date = new Date(call.lastTimestamp);
+                                  return isNaN(date.getTime()) ? 'N/A' : format(date, 'MMM dd, yyyy · hh:mm a');
                                } catch (e) { return 'N/A'; }
                             })()}
                           </span>
@@ -271,25 +402,40 @@ const LeadDetailPage: React.FC = () => {
                           <ShieldCheck size={14} className="text-emerald-500" /> Recommended Action
                        </h3>
                        <div className="p-5 rounded-2xl bg-secondary border border-border">
-                          <p className="text-sm font-bold text-foreground">{lead['Action to be taken']}</p>
+                          <p className="text-sm font-bold text-foreground">
+                            {lead['Action to be taken'] || (
+                              lead.sentiment === 'Hot'
+                                ? 'Schedule a follow-up call within 24 hours — high intent, close the deal now.'
+                                : lead.sentiment === 'Warm'
+                                ? 'Send a personalised email with pricing details and schedule a demo within 3 days.'
+                                : 'Add to re-engagement campaign; follow up in 2 weeks with a targeted offer.'
+                            )}
+                          </p>
                        </div>
                     </div>
                  </div>
 
-                 <div className="space-y-4 pt-4">
-                    <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                       <TrendingUp size={14} style={{ color: 'var(--brand-500)' }} /> Sentiment
-                    </h3>
-                    <div className="space-y-2">
-                       <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-semibold text-muted-foreground" style={{ color: 'var(--brand-600)' }}>{(lead.sentiment || 'Neutral')}</span>
-                          <span className="text-xs font-bold">88%</span>
-                       </div>
-                       <div className="h-2 w-full bg-accent rounded-full overflow-hidden">
-                          <div className={cn("h-full rounded-full shadow-sm", lead.sentiment === 'Positive' || lead.sentiment === 'Hot' ? "bg-emerald-500" : lead.sentiment === 'Negative' ? "bg-rose-500" : "")} style={lead.sentiment !== 'Positive' && lead.sentiment !== 'Hot' && lead.sentiment !== 'Negative' ? { background: 'var(--brand-500)' } : {}} />
-                       </div>
-                    </div>
-                 </div>
+                 {(() => {
+                    const sentimentPct = lead.sentiment === 'Hot' ? 88 : lead.sentiment === 'Warm' ? 55 : lead.sentiment === 'Cold' ? 22 : 50;
+                    const barColor = lead.sentiment === 'Hot' ? 'bg-rose-500' : lead.sentiment === 'Cold' ? 'bg-blue-500' : lead.sentiment === 'Warm' ? 'bg-amber-500' : '';
+                    const barStyle = !barColor ? { background: 'var(--brand-500)' } : {};
+                    return (
+                      <div className="space-y-4 pt-4">
+                         <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                            <TrendingUp size={14} style={{ color: 'var(--brand-500)' }} /> Sentiment Score
+                         </h3>
+                         <div className="space-y-2">
+                            <div className="flex justify-between items-center mb-1">
+                               <span className="text-xs font-semibold text-muted-foreground" style={{ color: 'var(--brand-600)' }}>{lead.sentiment || 'Neutral'}</span>
+                               <span className="text-xs font-bold">{sentimentPct}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-accent rounded-full overflow-hidden">
+                               <div className={cn("h-full rounded-full shadow-sm transition-all", barColor)} style={{ width: `${sentimentPct}%`, ...barStyle }} />
+                            </div>
+                         </div>
+                      </div>
+                    );
+                 })()}
               </div>
            </SectionCard>
 

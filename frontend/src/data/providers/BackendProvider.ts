@@ -60,8 +60,12 @@ function normalizeStatus(raw: any): 'Converted' | 'Lost' | 'Pending' {
 }
 
 export class BackendProvider implements IDataProvider {
-  async getDashboardKPIs(range: DateRange): Promise<KPIStats> {
-    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
+  async getDashboardKPIs(range: DateRange, leadType?: string): Promise<KPIStats> {
+    const stats = await bGet('/metrics', {
+      date_from: range.from,
+      date_to: range.to,
+      lead_type: !leadType || leadType === 'all' ? undefined : leadType,
+    });
     return {
       totalLeads: stats.total_leads,
       hotLeads: stats.bucket_counts?.['Hot'] || 0,
@@ -72,6 +76,8 @@ export class BackendProvider implements IDataProvider {
       unconverted: stats.bucket_counts?.['Lost'] || 0,
       pendingDecisions: stats.bucket_counts?.['Pending'] || 0,
       avgScore: stats.total_leads > 0 ? Math.round(((stats.bucket_counts?.['Hot'] || 0) * 90 + (stats.bucket_counts?.['Warm'] || 0) * 60 + (stats.bucket_counts?.['Cold'] || 0) * 30) / stats.total_leads) : 0,
+      demoBooked: stats.bucket_counts?.['DemoBooked'] || 0,
+      callbacks: stats.bucket_counts?.['Callback'] || 0,
       bucketCounts: stats.bucket_counts
     };
   }
@@ -83,7 +89,8 @@ export class BackendProvider implements IDataProvider {
         stage: stage,
         sentiment: params.sentiment === 'all' ? undefined : params.sentiment,
         date_from: params.range?.from,
-        date_to: params.range?.to
+        date_to: params.range?.to,
+        lead_type: !params.leadType || params.leadType === 'all' ? undefined : params.leadType,
     });
     return res.data.map((l: any) => ({
         ...l,
@@ -105,11 +112,57 @@ export class BackendProvider implements IDataProvider {
     }));
   }
 
-  async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string): Promise<TrendPoint[]> {
-    const leads = await this.getLeads({ range, bucket });
-    
+  async getLeadsTrend(range: DateRange, _preset: DatePreset, bucket?: string, leadType?: string): Promise<TrendPoint[]> {
     const isLostBucket = bucket?.toLowerCase() === 'lost';
     const isConvertedBucket = bucket?.toLowerCase() === 'converted';
+
+    // For Converted/Lost: use the dedicated outcomes table — reliable, no cache issues
+    if (isConvertedBucket || isLostBucket) {
+      const outcomeRows = await this.getOutcomesTrend({
+        outcome: isConvertedBucket ? 'Converted' : 'Lost',
+        date_from: range.from,
+        date_to: range.to,
+      });
+
+      // Group by outcome_date
+      const byDate: Record<string, any[]> = {};
+      outcomeRows.forEach((r: any) => {
+        const d = r.outcome_date?.substring(0, 10) || '';
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(r);
+      });
+
+      if (Object.keys(byDate).length === 0) return [];
+
+      const dates = Object.keys(byDate).sort();
+      let start = safeParseISO(dates[0]);
+      let end = safeParseISO(dates[dates.length - 1]);
+      // Ensure at least a 7-day window for visual context
+      if (Math.ceil((end.getTime() - start.getTime()) / 86400000) < 6) {
+        start = subDays(end, 6);
+      }
+
+      const interval = eachDayOfInterval({ start, end });
+      return interval.map(day => {
+        const dayStr = safeFormat(day, 'yyyy-MM-dd');
+        const rows = byDate[dayStr] || [];
+        if (isConvertedBucket) {
+          return { name: safeFormat(day, 'MMM dd'), hot: 0, warm: 0, cold: 0, converted: rows.length, lost: 0, from: dayStr, to: dayStr };
+        }
+        return {
+          name: safeFormat(day, 'MMM dd'),
+          hot:  rows.filter((r: any) => r.sentiment === 'Hot').length,
+          warm: rows.filter((r: any) => r.sentiment === 'Warm').length,
+          cold: rows.filter((r: any) => r.sentiment === 'Cold').length,
+          converted: 0,
+          lost: rows.length,
+          from: dayStr,
+          to: dayStr
+        };
+      });
+    }
+
+    const leads = await this.getLeads({ range, bucket, leadType });
 
     // Determine interval range
     let start = safeParseISO(range.from);
@@ -162,19 +215,6 @@ export class BackendProvider implements IDataProvider {
       const dayStr = safeFormat(day, 'yyyy-MM-dd');
       const dayLeads = leadsWithDayStrings.filter(l => l.dayString === dayStr);
 
-      if (isLostBucket || isConvertedBucket) {
-        return {
-          name: safeFormat(day, 'MMM dd'),
-          hot: dayLeads.filter(l => (l.sentiment || '').toLowerCase() === 'hot').length,
-          warm: dayLeads.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average' || !s; }).length,
-          cold: dayLeads.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
-          converted: 0,
-          lost: 0,
-          from: dayStr,
-          to: dayStr
-        };
-      }
-
       const pending = dayLeads.filter(l => normalizeStatus(l.status) === 'Pending');
       return {
         name: safeFormat(day, 'MMM dd'),
@@ -189,8 +229,12 @@ export class BackendProvider implements IDataProvider {
     });
   }
 
-  async getStageDistribution(range: DateRange, bucket?: string): Promise<StagePoint[]> {
-    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
+  async getStageDistribution(range: DateRange, bucket?: string, leadType?: string): Promise<StagePoint[]> {
+    const stats = await bGet('/metrics', {
+      date_from: range.from,
+      date_to: range.to,
+      lead_type: !leadType || leadType === 'all' ? undefined : leadType,
+    });
     const colors: Record<string, string> = {
       'Hot': '#ef4444',
       'Warm': '#f59e0b',
@@ -226,15 +270,20 @@ export class BackendProvider implements IDataProvider {
     }));
   }
 
-  async getFunnel(range: DateRange, bucket?: string): Promise<FunnelStep[]> {
-    const stats = await bGet('/metrics', { date_from: range.from, date_to: range.to });
-    const total = stats.total_leads || 1;
+  async getFunnel(range: DateRange, bucket?: string, leadType?: string): Promise<FunnelStep[]> {
+    const stats = await bGet('/metrics', {
+      date_from: range.from,
+      date_to: range.to,
+      lead_type: !leadType || leadType === 'all' ? undefined : leadType,
+    });
+    const total = stats.total_leads || 0;
     const bCounts = stats.bucket_counts || {};
+    const denom = total || 1;
     return [
-        { label: 'Total Intercepts', val: '100%', color: 'bg-teal-500' },
-        { label: 'High Intent (Hot)', val: Math.round(((bCounts['Hot'] || 0)/total)*100) + '%', color: 'bg-emerald-500' },
-        { label: 'Pending Action', val: Math.round(((bCounts['Pending'] || 0)/total)*100) + '%', color: 'bg-amber-500' },
-        { label: 'Converted', val: Math.round(((bCounts['Converted'] || 0)/total)*100) + '%', color: 'bg-rose-500' },
+        { label: 'Total Intercepts', val: `${total} leads`, color: 'bg-teal-500' },
+        { label: 'High Intent (Hot)', val: Math.round(((bCounts['Hot'] || 0)/denom)*100) + '%', color: 'bg-emerald-500' },
+        { label: 'Pending Action', val: Math.round(((bCounts['Pending'] || 0)/denom)*100) + '%', color: 'bg-amber-500' },
+        { label: 'Converted', val: Math.round(((bCounts['Converted'] || 0)/denom)*100) + '%', color: 'bg-rose-500' },
     ];
   }
 
@@ -267,8 +316,8 @@ export class BackendProvider implements IDataProvider {
     };
   }
 
-  async getVoiceTrend(range: DateRange, _preset: DatePreset): Promise<VoiceTrendPoint[]> {
-    const leads = await this.getLeads({ range });
+  async getVoiceTrend(range: DateRange, _preset: DatePreset, leadType?: string): Promise<VoiceTrendPoint[]> {
+    const leads = await this.getLeads({ range, leadType });
 
     // Determine interval range
     let start = safeParseISO(range.from);
@@ -336,7 +385,8 @@ export class BackendProvider implements IDataProvider {
         phone: c['Phone Number'],
         name: c['User Name'],
         lastMessage: c['User Message'],
-        lastTimestamp: c['Timestamp'],
+        // Use CallTimestamp (ISO-parsed) so date-fns parseISO works correctly in the UI
+        lastTimestamp: c['CallTimestamp'] || c['created_at'] || c['Timestamp'],
         status: 'Done',
         recording_url: c.recording_url || null
     }));
@@ -368,18 +418,32 @@ export class BackendProvider implements IDataProvider {
     };
   }
 
-  async getLeadInsightsSummary(range: DateRange): Promise<LeadInsightsSummary> {
-    const leads = await this.getLeads({ range });
+  async getLeadInsightsSummary(range: DateRange, leadType?: string): Promise<LeadInsightsSummary> {
+    const leads = await this.getLeads({ range, leadType });
     const concernMap: Record<string, number> = {};
     leads.forEach(l => {
-        if (l.concern) {
-            const c = l.concern.split(' ')[0];
-            concernMap[c] = (concernMap[c] || 0) + 1;
+        // Use the full concern string — trim and cap at 80 chars for grouping key
+        const raw = (l.concern || '').trim();
+        if (raw && raw.length > 3) {
+            const key = raw.length > 80 ? raw.substring(0, 80) : raw;
+            concernMap[key] = (concernMap[key] || 0) + 1;
         }
     });
-    const topConcerns = Object.entries(concernMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
-    if (leads.length === 0) return { sentimentTrend: [], topConcerns, highIntentLeads: [] };
-    const sDates = leads.map(l => parseAnyDate(l.CallTimestamp || l.created_at));
+    const topConcerns = Object.entries(concernMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10);
+    // Count sentiment directly from leads array — reliable, independent of date grouping
+    const hotCount  = leads.filter(l => l.sentiment === 'Hot').length;
+    const warmCount = leads.filter(l => l.sentiment === 'Warm').length;
+    const coldCount = leads.filter(l => l.sentiment === 'Cold').length;
+    const durValues = leads.map(l => Number(l.duration || 0)).filter(d => d > 0);
+    const avgDuration = durValues.length > 0 ? Math.round(durValues.reduce((a, b) => a + b, 0) / durValues.length) : 0;
+    if (leads.length === 0) return { totalLeads: 0, hotCount: 0, warmCount: 0, coldCount: 0, avgDuration: 0, sentimentTrend: [], topConcerns, highIntentLeads: [] };
+
+    // Build date range from actual call dates (capped at today to avoid future-date outliers)
+    const now = new Date();
+    const sDates = leads.map(l => {
+      const d = parseAnyDate(l.CallTimestamp || l.created_at);
+      return d > now ? now : d;  // cap future dates to today
+    });
     let sStart = sDates[0];
     let sEnd = sDates[0];
     sDates.forEach(d => { if (d < sStart) sStart = d; if (d > sEnd) sEnd = d; });
@@ -387,7 +451,11 @@ export class BackendProvider implements IDataProvider {
     if (sSpan > 180) sStart = subDays(sEnd, 179);
     const interval = eachDayOfInterval({ start: sStart, end: sEnd });
     const sentimentTrend = interval.map(day => {
-        const dayLeads = leads.filter(l => isSameDay(parseAnyDate(l.CallTimestamp || l.created_at), day));
+        const dayLeads = leads.filter(l => {
+          const d = parseAnyDate(l.CallTimestamp || l.created_at);
+          const capped = d > now ? now : d;
+          return isSameDay(capped, day);
+        });
         return {
             name: safeFormat(day, 'MMM dd'),
             pos: dayLeads.filter(l => l.sentiment === 'Hot').length,
@@ -395,7 +463,7 @@ export class BackendProvider implements IDataProvider {
             neg: dayLeads.filter(l => l.sentiment === 'Cold').length
         };
     });
-    return { sentimentTrend, topConcerns, highIntentLeads: leads.filter(l => l.sentiment === 'Hot').slice(0, 10) };
+    return { totalLeads: leads.length, hotCount, warmCount, coldCount, avgDuration, sentimentTrend, topConcerns, highIntentLeads: leads.filter(l => l.sentiment === 'Hot').slice(0, 10) };
   }
 
   async getTasks(_range: DateRange, filters?: Record<string, any>): Promise<LeadTask[]> {
@@ -489,5 +557,43 @@ export class BackendProvider implements IDataProvider {
 
   async getLiveCallActivity(): Promise<LiveCallActivity> {
     return bGet('/live/activity');
+  }
+
+  async getOutcomes(filters?: Record<string, any>): Promise<any[]> {
+    try {
+      return await bGet('/outcomes', filters);
+    } catch (e) {
+      console.error('[BackendProvider] getOutcomes error:', e);
+      return [];
+    }
+  }
+
+  async getOutcomesTrend(filters?: Record<string, any>): Promise<any[]> {
+    try {
+      return await bGet('/outcomes/trend', filters);
+    } catch (e) {
+      console.error('[BackendProvider] getOutcomesTrend error:', e);
+      return [];
+    }
+  }
+
+  async updateOutcome(id: string, updates: { reason?: string; note?: string }): Promise<boolean> {
+    try {
+      await bPatch(`/outcomes/${id}`, updates);
+      return true;
+    } catch (e) {
+      console.error('[BackendProvider] updateOutcome error:', e);
+      return false;
+    }
+  }
+
+  async deleteOutcome(id: string): Promise<boolean> {
+    try {
+      await bDelete(`/outcomes/${id}`);
+      return true;
+    } catch (e) {
+      console.error('[BackendProvider] deleteOutcome error:', e);
+      return false;
+    }
   }
 }

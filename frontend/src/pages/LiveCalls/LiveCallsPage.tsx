@@ -21,10 +21,12 @@ import type { LiveCallRecord } from '../../data/types';
 /* ────────────────────────────────────────────────────────────── */
 
 const STATUS_CONFIG = {
-  queued:    { label: 'To Call',   icon: PhoneIncoming, color: 'text-amber-500',   bg: 'bg-amber-500/10', border: 'border-amber-500/20', dot: 'bg-amber-500' },
-  calling:   { label: 'Calling',   icon: PhoneCall,     color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', dot: 'bg-emerald-500' },
-  completed: { label: 'Done',      icon: CheckCircle2,  color: 'text-blue-500',    bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-500' },
-  failed:    { label: 'Failed',    icon: XCircle,       color: 'text-rose-500',    bg: 'bg-rose-500/10', border: 'border-rose-500/20', dot: 'bg-rose-500' },
+  queued:      { label: 'To Call',      icon: PhoneIncoming, color: 'text-amber-500',   bg: 'bg-amber-500/10', border: 'border-amber-500/20', dot: 'bg-amber-500' },
+  calling:     { label: 'Calling',      icon: PhoneCall,     color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', dot: 'bg-emerald-500' },
+  completed:   { label: 'Done',         icon: CheckCircle2,  color: 'text-blue-500',    bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-500' },
+  failed:      { label: 'Missed',       icon: XCircle,       color: 'text-rose-500',    bg: 'bg-rose-500/10', border: 'border-rose-500/20', dot: 'bg-rose-500' },
+  demo_booked: { label: 'Demo Booked',  icon: PhoneCall,     color: 'text-violet-500',  bg: 'bg-violet-500/10', border: 'border-violet-500/20', dot: 'bg-violet-500' },
+  callback:    { label: 'Callback',     icon: PhoneOff,      color: 'text-orange-500',  bg: 'bg-orange-500/10', border: 'border-orange-500/20', dot: 'bg-orange-500' },
 };
 
 const SENTIMENT_COLORS: Record<string, string> = {
@@ -65,7 +67,7 @@ const LiveCallsPage: React.FC = () => {
     staleTime: pollMs - 2000,
   });
 
-  const summary = liveData?.summary ?? { total_today: 0, queued: 0, calling: 0, completed: 0, failed: 0 };
+  const summary = liveData?.summary ?? { total_today: 0, queued: 0, calling: 0, completed: 0, failed: 0, demo_booked: 0, callback: 0 };
 
   // Filter active calls by search
   const filteredActive = useMemo(() => {
@@ -96,11 +98,13 @@ const LiveCallsPage: React.FC = () => {
     { label: 'To Call', value: summary.queued, icon: PhoneIncoming, color: 'text-amber-500', bg: 'bg-amber-500/10' },
     { label: 'Calling Now', value: summary.calling, icon: PhoneCall, color: 'text-emerald-500', bg: 'bg-emerald-500/10', pulse: summary.calling > 0 },
     { label: 'Done', value: summary.completed, icon: CheckCircle2, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { label: 'Failed', value: summary.failed, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { label: 'Missed', value: summary.failed, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { label: 'Demo Booked', value: summary.demo_booked, icon: PhoneCall, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+    { label: 'Callbacks', value: summary.callback, icon: PhoneOff, color: 'text-orange-500', bg: 'bg-orange-500/10' },
   ];
 
   const completionRate = summary.total_today > 0
-    ? Math.round((summary.completed / summary.total_today) * 100)
+    ? Math.round(((summary.completed + summary.demo_booked + summary.callback) / summary.total_today) * 100)
     : 0;
 
   return (
@@ -143,11 +147,11 @@ const LiveCallsPage: React.FC = () => {
         {/* ── Stats Cards ────────────────────────────────── */}
         <div className="px-6 py-4 border-b border-border flex-shrink-0">
           {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+              {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
               {statCards.map((card, i) => (
                 <motion.div
                   key={card.label}
@@ -274,7 +278,9 @@ const CallRow: React.FC<{ call: LiveCallRecord; index: number }> = ({ call, inde
         call.call_status === 'calling' && "border-emerald-500/20 bg-emerald-500/[0.02]",
         call.call_status === 'queued' && "border-amber-500/20",
         call.call_status === 'failed' && "border-rose-500/20",
-        call.call_status === 'completed' && "border-border"
+        call.call_status === 'completed' && "border-border",
+        call.call_status === 'demo_booked' && "border-violet-500/20 bg-violet-500/[0.02]",
+        call.call_status === 'callback' && "border-orange-500/20 bg-orange-500/[0.02]"
       )}
     >
       {/* Status indicator */}
@@ -286,9 +292,12 @@ const CallRow: React.FC<{ call: LiveCallRecord; index: number }> = ({ call, inde
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-bold text-foreground truncate">{call.name || 'Unknown'}</h4>
-          <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full uppercase", sentimentClass)}>
-            {call.sentiment}
-          </span>
+          {/* Only show sentiment after call ends — not while queued or calling */}
+          {['completed', 'demo_booked', 'callback'].includes(call.call_status) && call.sentiment && (
+            <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full uppercase", sentimentClass)}>
+              {call.sentiment}
+            </span>
+          )}
         </div>
         <p className="text-[11px] font-medium text-muted-foreground mt-0.5">{call.phone}</p>
       </div>

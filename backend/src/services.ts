@@ -1,19 +1,29 @@
 import { supabase } from './lib/supabase.js';
+import pg from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Raw pg pool — used for task/employee writes to bypass PostgREST schema cache
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 3,
+});
 
 const LEADS_TABLE = 'call_leads';
 const COLS = {
   leads: {
-    id: 'leadid',
+    id: 'Leadid',              // capital L
     name: 'name',
     phone: 'mobile_number',
     status: 'status',
     timestamp: 'call_date_time',
-    duration: 'duration',
-    summary: 'summary',
+    duration: 'Duration',      // capital D, stored as string
+    summary: 'Summary',        // capital S
     recording: 'recording_url',
-    sentiment: 'sentiment',
-    created_at: 'created_at',
-    comments: 'comments'
+    sentiment: 'Sentiment',    // capital S
+    lead_type: 'Type of Lead'  // singular (no 's'), "Eligilble" or "Non Eligible"
+    // NOTE: no created_at column in DB
   }
 };
 
@@ -53,26 +63,56 @@ function normalizeStatus(raw: any): 'Converted' | 'Lost' | 'Pending' {
 
 /** Parse custom call_date_time format: "2:00 pmThursday, 12 March 2026" */
 function parseCallDateTime(s: string): string | null {
-  if (!s || typeof s !== 'string') return null;
+  if (!s || typeof s !== 'string' || s.trim() === '') return null;
   try {
-    // Extract date part: "12 March 2026"
-    const dateMatch = s.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
-    // Extract time part: "2:00 pm"
-    const timeMatch = s.match(/(\d{1,2}:\d{2}\s+[ap]m)/i);
-    
-    if (dateMatch && timeMatch) {
-      const dateStr = `${dateMatch[1]} ${timeMatch[1]}`;
-      const d = new Date(dateStr);
+    // Already ISO
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const d = new Date(s);
       return isNaN(d.getTime()) ? null : d.toISOString();
     }
-    
-    // Fallback: try parsing the whole string after removing the day name
-    const cleaned = s.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/gi, '');
+
+    // JS Date.toString() from Google Apps Script: "Tue Nov 03 2026 14:23:58 GMT+0530 ..."
+    if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+[A-Za-z]{3}/i.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+
+    // Voice bot format: "2:00 pmThursday, 12 March 2026" — extract date + time separately
+    const dateMatch = s.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+    const timeMatch = s.match(/(\d{1,2}:\d{2}\s*[ap]m)/i);
+    if (dateMatch && timeMatch) {
+      const d = new Date(`${dateMatch[1]} ${timeMatch[1]}`);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+
+    // Fallback: strip full day names and try native parse
+    const cleaned = s.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*/gi, '');
     const d2 = new Date(cleaned);
     return isNaN(d2.getTime()) ? null : d2.toISOString();
   } catch (e) {
     return null;
   }
+}
+
+/** Convert duration to seconds — handles plain numbers, HH:MM:SS strings,
+ *  and Google Sheets time values serialized as JS Date (anchored to Dec 30 1899) */
+function parseDuration(raw: any): number {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return Math.round(raw);
+  const s = String(raw).trim();
+  // Google Sheets time stored as JS Date string: "Sat Dec 30 1899 00:03:25 GMT+..."
+  if (s.includes('1899') || s.includes('Dec 30')) {
+    const t = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+    if (t) return Number(t[1]) * 3600 + Number(t[2]) * 60 + Number(t[3]);
+  }
+  // "H:MM:SS"
+  const hms = s.match(/^(\d+):(\d{2}):(\d{2})$/);
+  if (hms) return Number(hms[1]) * 3600 + Number(hms[2]) * 60 + Number(hms[3]);
+  // "MM:SS"
+  const ms = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (ms) return Number(ms[1]) * 60 + Number(ms[2]);
+  const n = Number(s);
+  return isNaN(n) ? 0 : Math.round(n);
 }
 
 export const conversationService = {
@@ -85,33 +125,36 @@ export const conversationService = {
     console.log('[conversations] filters:', { q, date_from, date_to, page, limit });
 
     const from = (page - 1) * limit;
-    const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
-    // DB-level prefilter on created_at to reduce transferred rows
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
-
-    const { data, error } = await query.order(COLS.leads.created_at, { ascending: false });
+    // No created_at column — fetch all, filter by parsed call_date_time in memory
+    const { data, error } = await query;
     if (error) throw error;
 
-    const allRows = (data || []).map(row => {
-      const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) || row[COLS.leads.created_at];
-      return {
-        ...row,
-        "Phone Number": row[COLS.leads.phone],
-        "User Name": row[COLS.leads.name],
-        "Timestamp": row[COLS.leads.timestamp],
-        "CallTimestamp": callTimestamp,
-        "Session ID": row[COLS.leads.id].toString(),
-        "User Message": row[COLS.leads.summary] || 'No summary',
-        "Bot Response": 'Voice Intercept',
-        "Conversation Stage": row[COLS.leads.status],
-        "recording_url": row[COLS.leads.recording] || null,
-        "callDate": callTimestamp.substring(0, 10)
-      };
-    });
+    const allRows = (data || [])
+      .map(row => {
+        const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) || new Date().toISOString();
+        return {
+          ...row,
+          "Phone Number": row[COLS.leads.phone],
+          "User Name": row[COLS.leads.name],
+          "Timestamp": row[COLS.leads.timestamp],
+          "CallTimestamp": callTimestamp,
+          "Session ID": String(row[COLS.leads.id]),
+          "User Message": row[COLS.leads.summary] || 'No summary',
+          "Bot Response": 'Voice Intercept',
+          "Conversation Stage": row[COLS.leads.status],
+          "recording_url": row[COLS.leads.recording] || null,
+          "callDate": callTimestamp.substring(0, 10)
+        };
+      })
+      // Sort newest first by parsed call date then by Leadid desc
+      .sort((a, b) => {
+        const dateDiff = b.callDate.localeCompare(a.callDate);
+        if (dateDiff !== 0) return dateDiff;
+        return parseInt(b['Session ID']) - parseInt(a['Session ID']);
+      });
 
     const filtered = allRows.filter(row => {
       if (date_from && row.callDate < date_from) return false;
@@ -126,13 +169,13 @@ export const conversationService = {
     };
   },
   getContacts: async (filters: any) => {
-    const { data, error } = await supabase.from(LEADS_TABLE).select(`${COLS.leads.phone}, ${COLS.leads.name}, ${COLS.leads.status}, ${COLS.leads.created_at}`).order(COLS.leads.created_at, { ascending: false });
+    const { data, error } = await supabase.from(LEADS_TABLE).select(`${COLS.leads.phone}, ${COLS.leads.name}, ${COLS.leads.status}`);
     if (error) throw error;
     const uniqueMap = new Map();
     (data || []).forEach((row: any) => {
       const phone = row[COLS.leads.phone];
       if (!uniqueMap.has(phone)) {
-        uniqueMap.set(phone, { phone, name: row[COLS.leads.name], lastStage: row[COLS.leads.status], lastSeen: row[COLS.leads.created_at] });
+        uniqueMap.set(phone, { phone, name: row[COLS.leads.name], lastStage: row[COLS.leads.status], lastSeen: row[COLS.leads.timestamp] });
       }
     });
     return Array.from(uniqueMap.values());
@@ -145,7 +188,7 @@ export const conversationService = {
       phone: data[COLS.leads.phone],
       messages: [{
         id: data[COLS.leads.id].toString(),
-        "Timestamp": data[COLS.leads.timestamp] || data[COLS.leads.created_at],
+        "Timestamp": data[COLS.leads.timestamp],
         "Phone Number": data[COLS.leads.phone],
         "User Name": data[COLS.leads.name],
         "User Message": data[COLS.leads.summary],
@@ -159,7 +202,7 @@ export const conversationService = {
           "lead stage": data[COLS.leads.status],
           "sentiment": normalizeSentiment(data[COLS.leads.sentiment]),
           "Conversation Summary": data[COLS.leads.summary],
-          "Action to be taken": data[COLS.leads.comments]
+          "Action to be taken": null
       }
     };
   }
@@ -167,7 +210,7 @@ export const conversationService = {
 
 export const leadService = {
   getLeads: async (filters: any) => {
-    const { stage, sentiment, q } = filters;
+    const { stage, sentiment, q, lead_type } = filters;
     const page = safeInt(filters.page, 1);
     const limit = safeInt(filters.limit, 500);
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
@@ -175,37 +218,56 @@ export const leadService = {
     console.log('[leads] filters:', { stage, sentiment, q, date_from, date_to, page, limit });
 
     const from = (page - 1) * limit;
-    const to = from + limit - 1;
     let query = supabase.from(LEADS_TABLE).select('*', { count: 'exact' });
 
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
-    // DB-level prefilter using created_at (proper timestamp) to reduce data transferred
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
+    // Fetch outcomes — source of truth for Converted/Lost
+    const { data: outcomesData } = await supabase.from('crm_lead_outcomes').select('lead_id, outcome');
+    const convertedLeadIds = new Set<string>();
+    const lostLeadIds = new Set<string>();
+    (outcomesData || []).forEach((o: any) => {
+      if (o.outcome === 'Converted') convertedLeadIds.add(String(o.lead_id));
+      else if (o.outcome === 'Lost') lostLeadIds.add(String(o.lead_id));
+    });
 
-    const { data, error } = await query.order(COLS.leads.created_at, { ascending: false });
+    // No created_at column — fetch all rows, filter by parsed call_date_time in memory
+    const { data, error } = await query;
     if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
 
-    const allRows = (data || []).map(row => {
-      const r = row as any;
-      const callTimestamp = parseCallDateTime(r[COLS.leads.timestamp]) || r[COLS.leads.created_at];
-      return {
-        ...r,
-        "Phone Number": r[COLS.leads.phone],
-        "User Name": r[COLS.leads.name],
-        "concern": r[COLS.leads.summary],
-        "lead stage": r[COLS.leads.status],
-        "sentiment": normalizeSentiment(r[COLS.leads.sentiment]),
-        "Conversation Summary": r[COLS.leads.summary],
-        "Action to be taken": r[COLS.leads.comments],
-        "recording_url": r[COLS.leads.recording] || null,
-        "Timestamp": r[COLS.leads.timestamp],
-        "CallTimestamp": callTimestamp,
-        "created_at": r[COLS.leads.created_at],
-        "callDate": callTimestamp.substring(0, 10)
-      };
-    });
+    const allRows = (data || [])
+      .map(row => {
+        const r = row as any;
+        const leadId = String(r[COLS.leads.id]);
+        const callTimestamp = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+        // Derive effective status from outcomes table (source of truth)
+        const effectiveStatus = convertedLeadIds.has(leadId) ? CRM_CONVERTED
+          : lostLeadIds.has(leadId) ? CRM_LOST
+          : r[COLS.leads.status];
+        return {
+          ...r,
+          leadid: leadId,
+          status: effectiveStatus,
+          "Phone Number": r[COLS.leads.phone],
+          "User Name": r[COLS.leads.name],
+          "concern": r[COLS.leads.summary],
+          "lead stage": effectiveStatus,
+          "sentiment": normalizeSentiment(r[COLS.leads.sentiment]),
+          "Conversation Summary": r[COLS.leads.summary],
+          "recording_url": r[COLS.leads.recording] || null,
+          "Timestamp": r[COLS.leads.timestamp],
+          "CallTimestamp": callTimestamp,
+          "created_at": callTimestamp,
+          "duration": parseDuration(r[COLS.leads.duration]),
+          "callDate": callTimestamp.substring(0, 10),
+          "lead_type": r[COLS.leads.lead_type] || null
+        };
+      })
+      .sort((a, b) => {
+        const dateDiff = b.callDate.localeCompare(a.callDate);
+        if (dateDiff !== 0) return dateDiff;
+        return parseInt(String(b[COLS.leads.id] || 0)) - parseInt(String(a[COLS.leads.id] || 0));
+      });
 
     // 1. Filter by Date
     let filtered = allRows.filter(row => {
@@ -213,26 +275,38 @@ export const leadService = {
       if (date_to && row.callDate > date_to) return false;
       return true;
     });
-    
-    // 2. Filter by Stage
+
+    // 2. Filter by Stage — uses effectiveStatus derived from outcomes table
     if (stage && stage !== 'all') {
       if (stage === 'Converted') {
-        filtered = filtered.filter(l => [CRM_CONVERTED, 'crm_converted', 'Converted', 'converted'].includes(l.status));
+        filtered = filtered.filter(l => convertedLeadIds.has(l.leadid));
       } else if (stage === 'Lost') {
-        const lostTerms = [CRM_LOST, 'crm_lost', 'Lost', 'lost', ...LOST_STATUSES];
-        filtered = filtered.filter(l => lostTerms.includes(l.status));
+        filtered = filtered.filter(l => lostLeadIds.has(l.leadid));
       } else if (stage === 'Pending') {
-        const finalized = [CRM_CONVERTED, 'crm_converted', 'Converted', 'converted', CRM_LOST, 'crm_lost', 'Lost', 'lost', ...LOST_STATUSES];
-        filtered = filtered.filter(l => !finalized.includes(l.status));
+        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid));
       } else if (['Hot', 'Warm', 'Cold'].includes(stage)) {
-        const finalized = [CRM_CONVERTED, 'crm_converted', 'Converted', 'converted', CRM_LOST, 'crm_lost', 'Lost', 'lost', ...LOST_STATUSES];
-        filtered = filtered.filter(l => !finalized.includes(l.status) && l.sentiment === stage);
+        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && l.sentiment === stage);
+      } else if (stage === 'DemoBooked') {
+        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && String(l[COLS.leads.status] || '').toLowerCase().trim() === 'demo_booked');
+      } else if (stage === 'Callback') {
+        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && ['call_back', 'callback'].includes(String(l[COLS.leads.status] || '').toLowerCase().trim()));
       }
     }
     
     // 3. Filter by Sentiment
     if (sentiment && sentiment !== 'all') {
       filtered = filtered.filter(l => l.sentiment === sentiment);
+    }
+
+    // 4. Filter by Lead Type (Eligible / Non-eligible)
+    if (lead_type && lead_type !== 'all') {
+      filtered = filtered.filter(l => {
+        const lt = String(l.lead_type || '').toLowerCase().trim();
+        // DB stores: "Eligilble" (typo) for eligible, "Non Eligible" for non-eligible
+        if (lead_type === 'eligible') return lt === 'eligilble' || lt === 'eligible' || lt === 'eligble';
+        if (lead_type === 'non-eligible') return lt === 'non eligible' || lt === 'non-eligible' || lt === 'ineligible' || lt === 'non_eligible';
+        return true;
+      });
     }
     
     const total = filtered.length;
@@ -246,12 +320,42 @@ export const leadService = {
   },
   updateStatus: async (params: any) => {
     const { leadid, status, reason, note } = params;
-    let dbStatus = CRM_CONVERTED;
-    if (status === 'NotInterested' || status === 'Closed') dbStatus = CRM_LOST;
-    const fullComment = `[${status}] Reason: ${reason} | Note: ${note}`;
-    const { data, error } = await supabase.from(LEADS_TABLE).update({ status: dbStatus, comments: fullComment }).eq('leadid', leadid).select();
-    if (error) throw error;
-    return { success: true, data };
+    const isConverted = status === 'Converted';
+    const dbStatus = isConverted ? CRM_CONVERTED : CRM_LOST;
+    const outcomeLabel = isConverted ? 'Converted' : 'Lost';
+
+    // 1. Fetch lead details before update (for outcome record)
+    const { rows: leadRows } = await pool.query(
+      `SELECT "Leadid", name, mobile_number, "Sentiment" FROM public.call_leads WHERE "Leadid"=$1`,
+      [String(leadid)]
+    );
+    const lead = leadRows[0];
+    const leadName = lead?.name || 'Unknown';
+    const phone = lead?.mobile_number || '';
+    const sentiment = normalizeSentiment(lead?.Sentiment);
+
+    // 2. Update call_leads status via raw pg (guaranteed to work in serverless)
+    await pool.query(
+      `UPDATE public.call_leads SET status=$1 WHERE "Leadid"=$2`,
+      [dbStatus, String(leadid)]
+    );
+
+    // 3. Upsert into crm_lead_outcomes (Supabase HTTP — fast in serverless)
+    const today = new Date().toISOString().substring(0, 10);
+    const { error: outcomeErr } = await supabase.from('crm_lead_outcomes').upsert({
+      lead_id: String(leadid),
+      phone_number: phone,
+      lead_name: leadName,
+      outcome: outcomeLabel,
+      reason: reason || '',
+      note: note || '',
+      sentiment,
+      outcome_date: today,
+      created_by: 'Admin',
+    }, { onConflict: 'lead_id' });
+    if (outcomeErr) console.warn('[outcomes] upsert warning:', outcomeErr.message);
+
+    return { success: true };
   }
 };
 
@@ -259,58 +363,80 @@ export const dashboardService = {
   getStats: async (filters: any = {}) => {
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
     const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
-    console.log('[metrics] filters:', { date_from, date_to });
+    const lead_type = filters.lead_type || null;
+    console.log('[metrics] filters:', { date_from, date_to, lead_type });
 
-    let query = supabase.from(LEADS_TABLE).select(`${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, ${COLS.leads.created_at}`, { count: 'exact' });
+    // Fetch ALL outcomes — no date filter. Outcomes represent current lead status,
+    // not time-bounded events. A converted lead is always converted.
+    const { data: outcomesData } = await supabase
+      .from('crm_lead_outcomes')
+      .select('lead_id, outcome');
+    const convertedIds = new Set<string>();
+    const lostIds = new Set<string>();
+    (outcomesData || []).forEach((o: any) => {
+      if (o.outcome === 'Converted') convertedIds.add(String(o.lead_id));
+      else if (o.outcome === 'Lost') lostIds.add(String(o.lead_id));
+    });
 
-    // DB-level prefilter on created_at to reduce transferred rows
-    if (date_from) query = query.gte(COLS.leads.created_at, `${date_from}T00:00:00`);
-    if (date_to) query = query.lte(COLS.leads.created_at, `${date_to}T23:59:59`);
-
-    const { data, count, error } = await query;
+    // Fetch all leads, filter by call date + lead_type in memory
+    const { data, error } = await supabase
+      .from(LEADS_TABLE)
+      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead"`);
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
 
-    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Converted: 0, Lost: 0 };
+    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Converted: 0, Lost: 0, DemoBooked: 0, Callback: 0 };
     const phones = new Set();
-    
-    // Filter data in-memory because call_date_time is a string and cannot be filtered effectively in SQL
+
     const filteredData = (data || []).filter(row => {
-      if (!date_from && !date_to) return true;
-      const callTs = parseCallDateTime((row as any)[COLS.leads.timestamp]) || (row as any)[COLS.leads.created_at];
-      const callDate = callTs.substring(0, 10);
-      if (date_from && callDate < date_from) return false;
-      if (date_to && callDate > date_to) return false;
+      const r = row as any;
+      if (date_from || date_to) {
+        const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+        const callDate = callTs.substring(0, 10);
+        if (date_from && callDate < date_from) return false;
+        if (date_to && callDate > date_to) return false;
+      }
+      if (lead_type && lead_type !== 'all') {
+        const lt = String(r['Type of Lead'] || '').toLowerCase().trim();
+        if (lead_type === 'eligible' && lt !== 'eligilble' && lt !== 'eligible' && lt !== 'eligble') return false;
+        if (lead_type === 'non-eligible' && lt !== 'non eligible' && lt !== 'non-eligible' && lt !== 'ineligible' && lt !== 'non_eligible') return false;
+      }
       return true;
     });
 
     filteredData.forEach((row: any) => {
-        const normalizedStatus = normalizeStatus(row[COLS.leads.status]);
-        const sent = normalizeSentiment(row[COLS.leads.sentiment]);
-
-        if (normalizedStatus === 'Converted') {
-          stage_counts.Converted++;
-        } else if (normalizedStatus === 'Lost') {
-          stage_counts.Lost++;
+      const leadId = String(row[COLS.leads.id]);
+      const sent = normalizeSentiment(row[COLS.leads.sentiment]);
+      if (convertedIds.has(leadId)) {
+        stage_counts.Converted++;
+      } else if (lostIds.has(leadId)) {
+        stage_counts.Lost++;
+      } else {
+        const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+        if (rawSt === 'demo_booked') {
+          stage_counts.DemoBooked++;
+        } else if (rawSt === 'call_back' || rawSt === 'callback') {
+          stage_counts.Callback++;
         } else {
-          // It's a pending/active lead, count its normalized sentiment
           stage_counts[sent] = (stage_counts[sent] || 0) + 1;
         }
-
-        if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
+      }
+      if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
     });
 
-    const totalFiltered = filteredData.length;
+    const total = filteredData.length;
     const bucket_counts = {
-      all: totalFiltered,
+      all: total,
       Hot: stage_counts.Hot,
       Warm: stage_counts.Warm,
       Cold: stage_counts.Cold,
       Converted: stage_counts.Converted,
       Lost: stage_counts.Lost,
-      Pending: totalFiltered - stage_counts.Converted - stage_counts.Lost
+      DemoBooked: stage_counts.DemoBooked,
+      Callback: stage_counts.Callback,
+      Pending: total - stage_counts.Converted - stage_counts.Lost - stage_counts.DemoBooked - stage_counts.Callback,
     };
     return {
-      total_leads: totalFiltered,
+      total_leads: total,
       unique_phones: phones.size,
       stage_counts,
       bucket_counts
@@ -325,45 +451,53 @@ const CALL_ACTIVE_STATUSES = ['to call', 'to_call', 'calling', 'ringing', 'in pr
 const CALL_QUEUED_STATUSES = ['to call', 'to_call', 'queued', 'scheduled'];
 const CALL_LIVE_STATUSES = ['calling', 'ringing', 'in progress', 'in_progress'];
 
-function normalizeCallStatus(raw: any): 'queued' | 'calling' | 'completed' | 'failed' {
+function normalizeCallStatus(raw: any): 'queued' | 'calling' | 'completed' | 'failed' | 'demo_booked' | 'callback' {
   const s = String(raw || '').toLowerCase().trim();
   if (CALL_QUEUED_STATUSES.includes(s)) return 'queued';
   if (CALL_LIVE_STATUSES.includes(s)) return 'calling';
   if (['failed', 'error', 'no answer', 'no_answer'].includes(s)) return 'failed';
+  if (s === 'demo_booked') return 'demo_booked';
+  if (s === 'call_back' || s === 'callback') return 'callback';
   // 'done' is the Google Sheet status after call ends
   if (s === 'done' || s === 'completed' || s === 'answered') return 'completed';
   return 'completed';
 }
 
 export const liveCallService = {
-  // Get current call activity — lightweight query, only recent rows
+  // Get current call activity — no created_at column, use parsed call_date_time for today filter
   getCallActivity: async () => {
-    // Fetch today's data only for live monitoring (performance: limits rows)
     const today = new Date().toISOString().substring(0, 10);
     const { data, error } = await supabase
       .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.created_at}`)
-      .gte(COLS.leads.created_at, `${today}T00:00:00`)
-      .order(COLS.leads.created_at, { ascending: false })
+      .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
       .limit(500);
 
     if (error) { console.error('[live] error:', error.message); throw error; }
 
-    const rows = (data || []).map((r: any) => ({
-      id: r[COLS.leads.id]?.toString(),
-      name: r[COLS.leads.name] || 'Unknown',
-      phone: r[COLS.leads.phone],
-      raw_status: r[COLS.leads.status],
-      call_status: normalizeCallStatus(r[COLS.leads.status]),
-      sentiment: normalizeSentiment(r[COLS.leads.sentiment]),
-      duration: r[COLS.leads.duration] || 0,
-      created_at: r[COLS.leads.created_at],
-    }));
+    const allRows = (data || []).map((r: any) => {
+      const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+      return {
+        id: String(r[COLS.leads.id]),
+        name: r[COLS.leads.name] || 'Unknown',
+        phone: r[COLS.leads.phone],
+        raw_status: r[COLS.leads.status],
+        call_status: normalizeCallStatus(r[COLS.leads.status]),
+        sentiment: normalizeSentiment(r[COLS.leads.sentiment]),
+        duration: parseDuration(r[COLS.leads.duration]),
+        created_at: callTs,
+        callDate: callTs.substring(0, 10),
+      };
+    });
+
+    // Only show today's rows in live monitor
+    const rows = allRows.filter(r => r.callDate === today);
 
     const queued = rows.filter(r => r.call_status === 'queued');
     const calling = rows.filter(r => r.call_status === 'calling');
     const completed = rows.filter(r => r.call_status === 'completed');
     const failed = rows.filter(r => r.call_status === 'failed');
+    const demoBooked = rows.filter(r => r.call_status === 'demo_booked');
+    const callback = rows.filter(r => r.call_status === 'callback');
 
     return {
       summary: {
@@ -372,10 +506,12 @@ export const liveCallService = {
         calling: calling.length,
         completed: completed.length,
         failed: failed.length,
+        demo_booked: demoBooked.length,
+        callback: callback.length,
       },
-      // Return active calls (queued + calling) in full, completed as recent 50
+      // Return active calls (queued + calling) in full; completed includes demo_booked + callback
       active_calls: [...calling, ...queued],
-      recent_completed: completed.slice(0, 50),
+      recent_completed: [...completed, ...demoBooked, ...callback].slice(0, 50),
       recent_failed: failed.slice(0, 20),
       last_updated: new Date().toISOString(),
     };
@@ -393,24 +529,26 @@ const DEFAULT_EMPLOYEES = [
 export const employeeService = {
   getAll: async () => {
     try {
+      // Try without ordering first (avoids failures if table schema has no created_at)
       const { data, error } = await supabase
         .from(EMPLOYEES_TABLE)
-        .select('*')
-        .order('created_at', { ascending: true });
+        .select('*');
       if (error) throw error;
       if (data && data.length > 0) {
-        return data.map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          email: e.email || '',
-          role: e.role || 'employee',
-          phone: e.phone || '',
-          department: e.department || '',
-        }));
+        return data
+          .map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            email: e.email || '',
+            role: e.role || 'employee',
+            phone: e.phone || '',
+            department: e.department || '',
+          }))
+          .sort((a: any, b: any) => a.name.localeCompare(b.name));
       }
       return DEFAULT_EMPLOYEES;
     } catch (e) {
-      console.warn('[employees] Supabase table not found, using defaults');
+      console.warn('[employees] Supabase fetch failed, using defaults:', (e as any)?.message);
       return DEFAULT_EMPLOYEES;
     }
   },
@@ -430,27 +568,23 @@ export const employeeService = {
   },
 
   create: async (employee: { name: string; email?: string; role?: string; phone?: string; department?: string }) => {
-    const row = {
-      name: employee.name,
-      email: employee.email || '',
-      role: employee.role || 'employee',
-      phone: employee.phone || '',
-      department: employee.department || '',
-    };
-    const { data, error } = await supabase.from(EMPLOYEES_TABLE).insert(row).select();
-    if (error) {
-      console.error('[employees] create error:', error.message);
-      throw error;
-    }
-    return data?.[0] || row;
+    // Use raw pg to bypass PostgREST schema cache
+    const { rows } = await pool.query(
+      `INSERT INTO public.crm_employees (name, email, role, phone, department)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [
+        employee.name,
+        employee.email || '',
+        employee.role || 'employee',
+        employee.phone || '',
+        employee.department || '',
+      ]
+    );
+    return rows[0];
   },
 
   delete: async (id: string) => {
-    const { error } = await supabase.from(EMPLOYEES_TABLE).delete().eq('id', id);
-    if (error) {
-      console.error('[employees] delete error:', error.message);
-      throw error;
-    }
+    await pool.query(`DELETE FROM public.crm_employees WHERE id=$1`, [id]);
     return { success: true };
   },
 };
@@ -510,81 +644,81 @@ export const taskService = {
   },
 
   createTask: async (task: any) => {
-    const row: any = {
-      phone_number: task.phone_number,
-      lead_name: task.lead_name || 'Unknown',
-      lead_sentiment: task.lead_sentiment || null,
-      due_at: task.due_at,
-      task_type: task.task_type || 'Follow-up Call',
-      notes: task.notes || '',
-      assigned_to: task.assigned_to || null,
-      assigned_by: task.assigned_by || 'Admin',
-      assignment_type: task.assignment_type || 'specific',
-      created_by: task.created_by || 'Admin',
-      done: false,
-      priority: task.priority || 'medium',
-    };
-    if (task.lead_insights_id) row.lead_insights_id = task.lead_insights_id;
-
-    const { data, error } = await supabase.from(TASKS_TABLE).insert(row).select();
-    if (error) {
-      console.error('[tasks] create error:', error.message);
-      throw error;
-    }
-    return data?.[0] || row;
+    // Use raw pg to bypass PostgREST schema cache
+    const { rows } = await pool.query(
+      `INSERT INTO public.lead_tasks
+         (phone_number, lead_name, lead_sentiment, lead_insights_id, task_type, notes,
+          due_at, assigned_to, assigned_by, assignment_type, priority, done, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false,$12)
+       RETURNING *`,
+      [
+        task.phone_number || null,
+        task.lead_name || 'Unknown',
+        task.lead_sentiment || null,
+        task.lead_insights_id || null,
+        task.task_type || 'Follow-up Call',
+        task.notes || '',
+        task.due_at,
+        task.assigned_to || null,
+        task.assigned_by || 'Admin',
+        task.assignment_type || 'specific',
+        task.priority || 'medium',
+        task.created_by || 'Admin',
+      ]
+    );
+    return rows[0];
   },
 
   createBulkTasks: async (tasks: any[]) => {
-    const rows = tasks.map(task => ({
-      phone_number: task.phone_number,
-      lead_name: task.lead_name || 'Unknown',
-      lead_sentiment: task.lead_sentiment || null,
-      due_at: task.due_at,
-      task_type: task.task_type || 'Follow-up Call',
-      notes: task.notes || '',
-      assigned_to: task.assigned_to || null,
-      assigned_by: task.assigned_by || 'Admin',
-      assignment_type: task.assignment_type || 'bulk',
-      created_by: task.created_by || 'Admin',
-      done: false,
-      priority: task.priority || 'medium',
-      ...(task.lead_insights_id ? { lead_insights_id: task.lead_insights_id } : {}),
-    }));
-
-    const { data, error } = await supabase.from(TASKS_TABLE).insert(rows).select();
-    if (error) {
-      console.error('[tasks] bulk create error:', error.message);
-      throw error;
+    const results = [];
+    for (const task of tasks) {
+      const { rows } = await pool.query(
+        `INSERT INTO public.lead_tasks
+           (phone_number, lead_name, lead_sentiment, lead_insights_id, task_type, notes,
+            due_at, assigned_to, assigned_by, assignment_type, priority, done, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false,$12)
+         RETURNING *`,
+        [
+          task.phone_number || null,
+          task.lead_name || 'Unknown',
+          task.lead_sentiment || null,
+          task.lead_insights_id || null,
+          task.task_type || 'Follow-up Call',
+          task.notes || '',
+          task.due_at,
+          task.assigned_to || null,
+          task.assigned_by || 'Admin',
+          task.assignment_type || 'specific',
+          task.priority || 'medium',
+          task.created_by || 'Admin',
+        ]
+      );
+      if (rows[0]) results.push(rows[0]);
     }
-    return data || [];
+    return results;
   },
 
   updateTask: async (id: string, updates: any) => {
-    const allowed: any = {};
-    if (updates.notes !== undefined) allowed.notes = updates.notes;
-    if (updates.due_at !== undefined) allowed.due_at = updates.due_at;
+    const sets: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    if (updates.notes !== undefined)       { sets.push(`notes=$${i++}`);        vals.push(updates.notes); }
+    if (updates.due_at !== undefined)      { sets.push(`due_at=$${i++}`);       vals.push(updates.due_at); }
+    if (updates.assigned_to !== undefined) { sets.push(`assigned_to=$${i++}`);  vals.push(updates.assigned_to); }
+    if (updates.task_type !== undefined)   { sets.push(`task_type=$${i++}`);    vals.push(updates.task_type); }
+    if (updates.priority !== undefined)    { sets.push(`priority=$${i++}`);     vals.push(updates.priority); }
     if (updates.done !== undefined) {
-      allowed.done = updates.done;
-      allowed.done_at = updates.done ? new Date().toISOString() : null;
+      sets.push(`done=$${i++}`);         vals.push(updates.done);
+      sets.push(`done_at=$${i++}`);      vals.push(updates.done ? new Date().toISOString() : null);
     }
-    if (updates.assigned_to !== undefined) allowed.assigned_to = updates.assigned_to;
-    if (updates.task_type !== undefined) allowed.task_type = updates.task_type;
-    if (updates.priority !== undefined) allowed.priority = updates.priority;
-
-    const { data, error } = await supabase.from(TASKS_TABLE).update(allowed).eq('id', id).select();
-    if (error) {
-      console.error('[tasks] update error:', error.message);
-      throw error;
-    }
-    return { success: true, data: data?.[0] };
+    if (sets.length === 0) return { success: true };
+    vals.push(id);
+    await pool.query(`UPDATE public.lead_tasks SET ${sets.join(', ')} WHERE id=$${i}`, vals);
+    return { success: true };
   },
 
   deleteTask: async (id: string) => {
-    const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', id);
-    if (error) {
-      console.error('[tasks] delete error:', error.message);
-      throw error;
-    }
+    await pool.query(`DELETE FROM public.lead_tasks WHERE id=$1`, [id]);
     return { success: true };
   },
 
@@ -618,23 +752,136 @@ export const taskService = {
   }
 };
 
+// ─── Lead Outcomes (Converted / Lost permanent log) ─────────────
+const OUTCOMES_TABLE = 'crm_lead_outcomes';
+
+export const outcomeService = {
+  getAll: async (filters: any = {}) => {
+    const { outcome, q, date_from, date_to } = filters;
+    let query = supabase
+      .from(OUTCOMES_TABLE)
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (outcome && outcome !== 'all') query = query.eq('outcome', outcome);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[outcomes] fetch error:', error.message);
+      return [];
+    }
+
+    let rows = data || [];
+
+    if (q) {
+      const lower = q.toLowerCase();
+      rows = rows.filter((r: any) =>
+        (r.lead_name || '').toLowerCase().includes(lower) ||
+        (r.phone_number || '').includes(lower) ||
+        (r.reason || '').toLowerCase().includes(lower)
+      );
+    }
+    if (date_from) rows = rows.filter((r: any) => r.outcome_date >= date_from);
+    if (date_to)   rows = rows.filter((r: any) => r.outcome_date <= date_to);
+
+    return rows;
+  },
+
+  update: async (id: string, updates: { reason?: string; note?: string }) => {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    if (updates.reason !== undefined) { sets.push(`reason=$${i++}`); vals.push(updates.reason); }
+    if (updates.note   !== undefined) { sets.push(`note=$${i++}`);   vals.push(updates.note); }
+    if (sets.length === 0) return { success: true };
+    vals.push(id);
+    await pool.query(`UPDATE public.crm_lead_outcomes SET ${sets.join(', ')} WHERE id=$${i}`, vals);
+    return { success: true };
+  },
+
+  delete: async (id: string) => {
+    // Get the record first so we can revert the lead status
+    const { data } = await supabase.from(OUTCOMES_TABLE).select('lead_id, outcome').eq('id', id).maybeSingle();
+    await pool.query(`DELETE FROM public.crm_lead_outcomes WHERE id=$1`, [id]);
+
+    // Revert call_leads status back to 'pending' — fire-and-forget
+    if (data?.lead_id) {
+      void (async () => {
+        try {
+          await supabase.from(LEADS_TABLE).update({ status: 'pending' }).eq(COLS.leads.id, data.lead_id);
+        } catch (_) {}
+      })();
+    }
+    return { success: true };
+  },
+
+  getTrend: async (filters: any = {}) => {
+    const { outcome, date_from, date_to } = filters;
+    let query = supabase
+      .from(OUTCOMES_TABLE)
+      .select('outcome, sentiment, outcome_date')
+      .order('outcome_date', { ascending: true });
+
+    if (outcome && outcome !== 'all') query = query.eq('outcome', outcome);
+    if (date_from) query = query.gte('outcome_date', date_from);
+    if (date_to)   query = query.lte('outcome_date', date_to);
+
+    const { data, error } = await query;
+    if (error) { console.error('[outcomes] trend error:', error.message); return []; }
+
+    // If outcomes table has data, return it directly
+    if (data && data.length > 0) return data;
+
+    // Fallback: synthesise from call_leads for leads converted/lost before outcomes table existed
+    const isConverted = outcome === 'Converted';
+    const isLost = outcome === 'Lost';
+    const statusFilter = isConverted
+      ? [CRM_CONVERTED, 'converted']
+      : isLost
+      ? [CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES]
+      : [CRM_CONVERTED, 'converted', CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES];
+
+    let leadsQuery = supabase
+      .from(LEADS_TABLE)
+      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.timestamp}`)
+      .in(COLS.leads.status, statusFilter);
+
+    const { data: leads } = await leadsQuery;
+    if (!leads || leads.length === 0) return [];
+
+    return leads.map((r: any) => {
+      const ts = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+      const callDate = ts.substring(0, 10);
+      const normalizedSentiment = normalizeSentiment(r[COLS.leads.sentiment]);
+      const LOST_SET = new Set([CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES]);
+      const outcomeLabel = LOST_SET.has(String(r[COLS.leads.status]).toLowerCase()) ? 'Lost' : 'Converted';
+      return {
+        outcome: outcomeLabel,
+        sentiment: normalizedSentiment,
+        outcome_date: callDate,
+      };
+    });
+  },
+};
+
 export const noteService = { getNotes: async () => [] };
 export const tagService = { getTags: async () => [] };
 export const proxyService = { 
   checkTable: async (table: string) => table === 'call_leads',
   getInsightByPhone: async (phone: string) => {
-    const { data, error } = await supabase.from(LEADS_TABLE).select('*').eq(COLS.leads.phone, phone).order(COLS.leads.created_at, { ascending: false }).limit(1).maybeSingle();
+    const { data, error } = await supabase.from(LEADS_TABLE).select('*').eq(COLS.leads.phone, phone).limit(1).maybeSingle();
     if (error) throw error;
     if (!data) return null;
     return {
         ...data,
+        leadid: String(data[COLS.leads.id]),
         "Phone Number": data[COLS.leads.phone],
         "User Name": data[COLS.leads.name],
         "concern": data[COLS.leads.summary],
         "lead stage": data[COLS.leads.status],
         "sentiment": normalizeSentiment(data[COLS.leads.sentiment]),
         "Conversation Summary": data[COLS.leads.summary],
-        "Action to be taken": data[COLS.leads.comments]
+        "Action to be taken": null
     };
   }
 };

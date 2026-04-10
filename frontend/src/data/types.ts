@@ -10,6 +10,8 @@ export interface KPIStats {
   unconverted: number;
   pendingDecisions: number;
   avgScore: number;
+  demoBooked: number;
+  callbacks: number;
   bucketCounts?: Record<string, number>;
 }
 
@@ -36,6 +38,7 @@ export interface LeadInsightRow {
   CallTimestamp?: string;
   duration?: string | number;
   recording_url?: string | null;
+  lead_type?: string | null;
 }
 
 export interface TrendPoint {
@@ -104,6 +107,11 @@ export interface ChatSession {
 }
 
 export interface LeadInsightsSummary {
+  totalLeads: number;
+  hotCount: number;
+  warmCount: number;
+  coldCount: number;
+  avgDuration: number;
   sentimentTrend: { name: string; pos: number; neu: number; neg: number }[];
   topConcerns: { name: string; count: number }[];
   highIntentLeads: LeadInsightRow[];
@@ -162,6 +170,7 @@ export interface FetchLeadsParams {
   worked?: 'yes' | 'no' | 'all';
   agent?: string | null;
   stage?: string | null;
+  leadType?: string;
 }
 
 export interface UpdateLeadStatusParams {
@@ -182,7 +191,7 @@ export interface LiveCallRecord {
   name: string;
   phone: string;
   raw_status: string;
-  call_status: 'queued' | 'calling' | 'completed' | 'failed';
+  call_status: 'queued' | 'calling' | 'completed' | 'failed' | 'demo_booked' | 'callback';
   sentiment: string;
   duration: number;
   created_at: string;
@@ -195,11 +204,27 @@ export interface LiveCallActivity {
     calling: number;
     completed: number;
     failed: number;
+    demo_booked: number;
+    callback: number;
   };
   active_calls: LiveCallRecord[];
   recent_completed: LiveCallRecord[];
   recent_failed: LiveCallRecord[];
   last_updated: string;
+}
+
+export interface LeadOutcome {
+  id: string;
+  lead_id: string;
+  phone_number: string;
+  lead_name: string;
+  outcome: 'Converted' | 'Lost';
+  reason: string;
+  note: string;
+  sentiment: string;
+  outcome_date: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface FunnelStep {
