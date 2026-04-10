@@ -222,14 +222,16 @@ export const leadService = {
 
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
-    // Fetch outcomes — source of truth for Converted/Lost
-    const { data: outcomesData } = await supabase.from('crm_lead_outcomes').select('lead_id, outcome');
+    // Fetch outcomes — source of truth for Converted/Lost (no date filter — permanent)
+    const { data: outcomesData, error: outcomesErr } = await supabase.from('crm_lead_outcomes').select('lead_id, outcome');
+    if (outcomesErr) console.warn('[leads] outcomes query warning:', outcomesErr.message);
     const convertedLeadIds = new Set<string>();
     const lostLeadIds = new Set<string>();
     (outcomesData || []).forEach((o: any) => {
       if (o.outcome === 'Converted') convertedLeadIds.add(String(o.lead_id));
       else if (o.outcome === 'Lost') lostLeadIds.add(String(o.lead_id));
     });
+    console.log('[leads] outcomes loaded — converted:', convertedLeadIds.size, 'lost:', lostLeadIds.size);
 
     // No created_at column — fetch all rows, filter by parsed call_date_time in memory
     const { data, error } = await query;
@@ -269,8 +271,9 @@ export const leadService = {
         return parseInt(String(b[COLS.leads.id] || 0)) - parseInt(String(a[COLS.leads.id] || 0));
       });
 
-    // 1. Filter by Date
-    let filtered = allRows.filter(row => {
+    // 1. Filter by Date (skip for Converted/Lost — permanent outcomes are date-agnostic)
+    const isOutcomeBucket = stage === 'Converted' || stage === 'Lost';
+    let filtered = isOutcomeBucket ? allRows : allRows.filter(row => {
       if (date_from && row.callDate < date_from) return false;
       if (date_to && row.callDate > date_to) return false;
       return true;
@@ -366,17 +369,19 @@ export const dashboardService = {
     const lead_type = filters.lead_type || null;
     console.log('[metrics] filters:', { date_from, date_to, lead_type });
 
-    // Fetch ALL outcomes — no date filter. Outcomes represent current lead status,
-    // not time-bounded events. A converted lead is always converted.
-    const { data: outcomesData } = await supabase
+    // Fetch ALL outcomes — no date filter. Outcomes are permanent. A converted
+    // lead is ALWAYS converted regardless of what date range the user is viewing.
+    const { data: outcomesData, error: outcomesErr } = await supabase
       .from('crm_lead_outcomes')
       .select('lead_id, outcome');
+    if (outcomesErr) console.warn('[metrics] outcomes query warning:', outcomesErr.message);
     const convertedIds = new Set<string>();
     const lostIds = new Set<string>();
     (outcomesData || []).forEach((o: any) => {
       if (o.outcome === 'Converted') convertedIds.add(String(o.lead_id));
       else if (o.outcome === 'Lost') lostIds.add(String(o.lead_id));
     });
+    console.log('[metrics] outcomes loaded — converted:', convertedIds.size, 'lost:', lostIds.size);
 
     // Fetch all leads, filter by call date + lead_type in memory
     const { data, error } = await supabase
@@ -384,7 +389,8 @@ export const dashboardService = {
       .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead"`);
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
 
-    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, Converted: 0, Lost: 0, DemoBooked: 0, Callback: 0 };
+    // stage_counts only tracks active (non-outcome) leads in the date range
+    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, DemoBooked: 0, Callback: 0 };
     const phones = new Set();
 
     const filteredData = (data || []).filter(row => {
@@ -405,40 +411,43 @@ export const dashboardService = {
 
     filteredData.forEach((row: any) => {
       const leadId = String(row[COLS.leads.id]);
+      // Converted/Lost leads are counted from outcomes table — skip here
+      if (convertedIds.has(leadId) || lostIds.has(leadId)) {
+        if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
+        return;
+      }
       const sent = normalizeSentiment(row[COLS.leads.sentiment]);
-      if (convertedIds.has(leadId)) {
-        stage_counts.Converted++;
-      } else if (lostIds.has(leadId)) {
-        stage_counts.Lost++;
+      const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+      if (rawSt === 'demo_booked') {
+        stage_counts.DemoBooked++;
+      } else if (rawSt === 'call_back' || rawSt === 'callback') {
+        stage_counts.Callback++;
       } else {
-        const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
-        if (rawSt === 'demo_booked') {
-          stage_counts.DemoBooked++;
-        } else if (rawSt === 'call_back' || rawSt === 'callback') {
-          stage_counts.Callback++;
-        } else {
-          stage_counts[sent] = (stage_counts[sent] || 0) + 1;
-        }
+        stage_counts[sent] = (stage_counts[sent] || 0) + 1;
       }
       if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
     });
 
     const total = filteredData.length;
+    // Converted/Lost come directly from outcomes table — permanent, date-agnostic
+    const convertedCount = convertedIds.size;
+    const lostCount = lostIds.size;
     const bucket_counts = {
       all: total,
       Hot: stage_counts.Hot,
       Warm: stage_counts.Warm,
       Cold: stage_counts.Cold,
-      Converted: stage_counts.Converted,
-      Lost: stage_counts.Lost,
+      Converted: convertedCount,
+      Lost: lostCount,
       DemoBooked: stage_counts.DemoBooked,
       Callback: stage_counts.Callback,
-      Pending: total - stage_counts.Converted - stage_counts.Lost - stage_counts.DemoBooked - stage_counts.Callback,
+      Pending: total - stage_counts.Hot - stage_counts.Warm - stage_counts.Cold - stage_counts.DemoBooked - stage_counts.Callback,
     };
+    console.log('[metrics] bucket_counts:', JSON.stringify(bucket_counts));
     return {
       total_leads: total,
       unique_phones: phones.size,
-      stage_counts,
+      stage_counts: { ...stage_counts, Converted: convertedCount, Lost: lostCount },
       bucket_counts
     };
   }
@@ -817,20 +826,31 @@ export const outcomeService = {
 
   getTrend: async (filters: any = {}) => {
     const { outcome, date_from, date_to } = filters;
+    // Fetch ALL outcomes without PostgREST date filter — in-memory filter avoids
+    // timezone mismatches with DATE columns (same approach as getAll).
     let query = supabase
       .from(OUTCOMES_TABLE)
       .select('outcome, sentiment, outcome_date')
       .order('outcome_date', { ascending: true });
 
     if (outcome && outcome !== 'all') query = query.eq('outcome', outcome);
-    if (date_from) query = query.gte('outcome_date', date_from);
-    if (date_to)   query = query.lte('outcome_date', date_to);
 
     const { data, error } = await query;
     if (error) { console.error('[outcomes] trend error:', error.message); return []; }
 
+    // Apply date filter in memory on normalized date strings
+    let rows = (data || []) as any[];
+    if (date_from) rows = rows.filter((r: any) => {
+      const d = (r.outcome_date || '').substring(0, 10);
+      return d >= date_from;
+    });
+    if (date_to) rows = rows.filter((r: any) => {
+      const d = (r.outcome_date || '').substring(0, 10);
+      return d <= date_to;
+    });
+
     // If outcomes table has data, return it directly
-    if (data && data.length > 0) return data;
+    if (rows.length > 0) return rows;
 
     // Fallback: synthesise from call_leads for leads converted/lost before outcomes table existed
     const isConverted = outcome === 'Converted';
