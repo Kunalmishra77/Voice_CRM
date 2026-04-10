@@ -61,34 +61,68 @@ function normalizeStatus(raw: any): 'Converted' | 'Lost' | 'Pending' {
   return 'Pending';
 }
 
-/** Parse custom call_date_time format: "2:00 pmThursday, 12 March 2026" */
+// IST offset: UTC+5:30 = 330 minutes = 19800000 ms
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
+/** Returns true if a date string has explicit timezone information */
+function hasTimezone(s: string): boolean {
+  // Matches: Z, +05:30, -05:30, GMT+0530, UTC, etc.
+  return /Z$|[+-]\d{2}:?\d{2}|GMT|UTC/i.test(s);
+}
+
+/**
+ * Parse custom call_date_time format and return correct UTC ISO string.
+ *
+ * The voice bot and Google Sheets store times in IST (UTC+5:30) with NO
+ * timezone marker.  Vercel runs in UTC so `new Date("2:00 pm")` treats it
+ * as UTC 14:00, which then displays as 19:30 IST in the browser — 5.5 h
+ * too late.  We detect the missing-timezone case and subtract the IST
+ * offset so the stored UTC value is correct for the actual wall-clock time.
+ */
 function parseCallDateTime(s: string): string | null {
   if (!s || typeof s !== 'string' || s.trim() === '') return null;
   try {
-    // Already ISO
+    // ── Already ISO (e.g. "2026-03-12T14:00:00.000Z" or "…+05:30") ──────
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
       const d = new Date(s);
-      return isNaN(d.getTime()) ? null : d.toISOString();
+      if (isNaN(d.getTime())) return null;
+      // ISO without timezone treated as UTC by Node — if truly no TZ marker,
+      // assume IST and shift back so the stored UTC time is correct.
+      if (!hasTimezone(s)) {
+        return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
+      }
+      return d.toISOString();
     }
 
-    // JS Date.toString() from Google Apps Script: "Tue Nov 03 2026 14:23:58 GMT+0530 ..."
+    // ── JS Date.toString() from Google Apps Script ────────────────────────
+    // Example: "Tue Nov 03 2026 14:23:58 GMT+0530 (India Standard Time)"
+    // Has explicit GMT+0530 → new Date() converts correctly to UTC.
     if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+[A-Za-z]{3}/i.test(s)) {
       const d = new Date(s);
       if (!isNaN(d.getTime())) return d.toISOString();
     }
 
-    // Voice bot format: "2:00 pmThursday, 12 March 2026" — extract date + time separately
+    // ── Voice bot format: "2:00 pmThursday, 12 March 2026" ───────────────
+    // No timezone marker → time is IST wall-clock.
     const dateMatch = s.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
     const timeMatch = s.match(/(\d{1,2}:\d{2}\s*[ap]m)/i);
     if (dateMatch && timeMatch) {
-      const d = new Date(`${dateMatch[1]} ${timeMatch[1]}`);
-      if (!isNaN(d.getTime())) return d.toISOString();
+      // Parsed as UTC on Vercel server; subtract IST offset to get correct UTC
+      const naive = new Date(`${dateMatch[1]} ${timeMatch[1]}`);
+      if (!isNaN(naive.getTime())) {
+        return new Date(naive.getTime() - IST_OFFSET_MS).toISOString();
+      }
     }
 
-    // Fallback: strip full day names and try native parse
+    // ── Fallback: strip full day names and try native parse ───────────────
     const cleaned = s.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*/gi, '');
     const d2 = new Date(cleaned);
-    return isNaN(d2.getTime()) ? null : d2.toISOString();
+    if (isNaN(d2.getTime())) return null;
+    // If no explicit TZ info in the cleaned string, assume IST
+    if (!hasTimezone(cleaned)) {
+      return new Date(d2.getTime() - IST_OFFSET_MS).toISOString();
+    }
+    return d2.toISOString();
   } catch (e) {
     return null;
   }
