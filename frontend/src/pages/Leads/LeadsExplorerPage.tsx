@@ -31,7 +31,7 @@ import {
 const COLORS: Record<string, string> = {
   Hot: '#ef4444', Warm: '#f59e0b', Cold: '#3b82f6',
   Converted: '#06b6d4', Lost: '#64748b', Pending: '#a855f7',
-  DemoBooked: '#8b5cf6', Callback: '#f97316'
+  DemoBooked: '#8b5cf6', Callback: '#f97316', Failed: '#ef4444'
 };
 
 const LOST_STATUSES = ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
@@ -43,6 +43,7 @@ const BUCKET_OPTIONS = [
   { value: 'Cold', label: 'Cold' },
   { value: 'DemoBooked', label: 'Demo Booked' },
   { value: 'Callback', label: 'Callback' },
+  { value: 'Failed', label: 'Failed / Missed' },
   { value: 'Converted', label: 'Converted' },
   { value: 'Lost', label: 'Lost' },
   { value: 'Pending', label: 'Pending' },
@@ -335,7 +336,7 @@ const LeadsExplorerPage: React.FC = () => {
       return [{ name: 'Converted', value: 100, color: COLORS.Converted }];
     }
 
-    if (bucket === 'Pending' || bucket === 'DemoBooked' || bucket === 'Callback') {
+    if (bucket === 'Pending' || bucket === 'DemoBooked' || bucket === 'Callback' || bucket === 'Failed') {
       const hotCount = source.filter(l => l.sentiment === 'Hot').length;
       const warmCount = source.filter(l => l.sentiment === 'Warm').length;
       const coldCount = source.filter(l => l.sentiment === 'Cold').length;
@@ -365,7 +366,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Converted') return ['converted'];
     if (bucket === 'Lost') return ['hot', 'warm', 'cold'];
     if (bucket === 'Pending') return ['hot', 'warm', 'cold'];
-    if (bucket === 'DemoBooked' || bucket === 'Callback') return ['hot', 'warm', 'cold'];
+    if (bucket === 'DemoBooked' || bucket === 'Callback' || bucket === 'Failed') return ['hot', 'warm', 'cold'];
     return ['hot', 'warm', 'cold', 'converted', 'lost'];
   }, [bucket]);
 
@@ -508,6 +509,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Pending') return 'Sentiment of pending leads';
     if (bucket === 'DemoBooked') return 'Sentiment of demo-booked leads';
     if (bucket === 'Callback') return 'Sentiment of callback leads';
+    if (bucket === 'Failed') return 'Sentiment of failed / missed calls';
     if (['Hot', 'Warm', 'Cold', 'Converted'].includes(bucket)) return `${bucket} leads only`;
     return 'Lead distribution';
   }, [bucket]);
@@ -763,6 +765,7 @@ const LeadsExplorerPage: React.FC = () => {
                 { label: 'Cold', count: kpis?.bucketCounts?.['Cold'] || 0, color: COLORS.Cold, bucket: 'Cold' },
                 { label: 'Demo Booked', count: kpis?.bucketCounts?.['DemoBooked'] || 0, color: COLORS.DemoBooked, bucket: 'DemoBooked' },
                 { label: 'Callback', count: kpis?.bucketCounts?.['Callback'] || 0, color: COLORS.Callback, bucket: 'Callback' },
+                { label: 'Failed', count: kpis?.bucketCounts?.['Failed'] || 0, color: COLORS.Failed, bucket: 'Failed' },
                 { label: 'Converted', count: kpis?.bucketCounts?.['Converted'] || 0, color: COLORS.Converted, bucket: 'Converted' },
                 { label: 'Lost', count: kpis?.bucketCounts?.['Lost'] || 0, color: COLORS.Lost, bucket: 'Lost' },
                 { label: 'Pending', count: kpis?.bucketCounts?.['Pending'] || 0, color: COLORS.Pending, bucket: 'Pending' },
@@ -825,6 +828,8 @@ const LeadsExplorerPage: React.FC = () => {
                               <Badge variant="default" className="font-medium text-xs bg-violet-500/15 text-violet-400 border-violet-500/20">Demo Booked</Badge>
                             ) : rawStatus === 'call_back' || rawStatus === 'callback' ? (
                               <Badge variant="default" className="font-medium text-xs bg-orange-500/15 text-orange-400 border-orange-500/20">Callback</Badge>
+                            ) : rawStatus === 'failed' || rawStatus === 'no answer' || rawStatus === 'no_answer' || rawStatus === 'error' ? (
+                              <Badge variant="default" className="font-medium text-xs bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
                             ) : (
                               <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'default'} className="font-medium text-xs">{lead.scoring.bucket}</Badge>
                             )}
