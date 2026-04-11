@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Users, Flame, Zap, CheckCircle2, XCircle, TrendingUp,
-  Activity, FileSearch, Clock, Target, Radio, PieChart as PieIcon, BarChart4, Loader2, ArrowRight, Calendar, ChevronDown
+  Activity, FileSearch, Clock, Target, Radio, PieChart as PieIcon, BarChart4, Loader2, ArrowRight, Calendar, ChevronDown, PhoneMissed
 } from 'lucide-react';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -170,8 +170,9 @@ const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undef
       <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
       <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" onClick={() => handleStatClick('Hot')} />
     </div>
-    {((kpis?.demoBooked ?? 0) > 0 || (kpis?.callbacks ?? 0) > 0) && (
-      <div className="grid grid-cols-2 gap-4">
+    {((kpis?.demoBooked ?? 0) > 0 || (kpis?.callbacks ?? 0) > 0 || (kpis?.failedCalls ?? 0) > 0) && (
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard label="Failed / Missed" value={kpis?.failedCalls ?? 0} icon={PhoneMissed} variant="danger" onClick={() => handleStatClick('Failed')} />
         <StatCard label="Demo Booked" value={kpis?.demoBooked ?? 0} icon={Radio} variant="purple" onClick={() => handleStatClick('DemoBooked')} />
         <StatCard label="Callbacks" value={kpis?.callbacks ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Callback')} />
       </div>

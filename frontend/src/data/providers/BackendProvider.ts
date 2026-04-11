@@ -78,6 +78,7 @@ export class BackendProvider implements IDataProvider {
       avgScore: stats.total_leads > 0 ? Math.round(((stats.bucket_counts?.['Hot'] || 0) * 90 + (stats.bucket_counts?.['Warm'] || 0) * 60 + (stats.bucket_counts?.['Cold'] || 0) * 30) / stats.total_leads) : 0,
       demoBooked: stats.bucket_counts?.['DemoBooked'] || 0,
       callbacks: stats.bucket_counts?.['Callback'] || 0,
+      failedCalls: stats.bucket_counts?.['Failed'] || 0,
       bucketCounts: stats.bucket_counts
     };
   }

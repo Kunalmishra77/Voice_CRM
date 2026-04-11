@@ -12,6 +12,7 @@ export interface KPIStats {
   avgScore: number;
   demoBooked: number;
   callbacks: number;
+  failedCalls: number;
   bucketCounts?: Record<string, number>;
 }
 

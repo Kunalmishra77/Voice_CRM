@@ -327,6 +327,8 @@ export const leadService = {
         filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && String(l[COLS.leads.status] || '').toLowerCase().trim() === 'demo_booked');
       } else if (stage === 'Callback') {
         filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && ['call_back', 'callback'].includes(String(l[COLS.leads.status] || '').toLowerCase().trim()));
+      } else if (stage === 'Failed') {
+        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && ['failed', 'error', 'no answer', 'no_answer'].includes(String(l[COLS.leads.status] || '').toLowerCase().trim()));
       }
     }
     
@@ -424,8 +426,10 @@ export const dashboardService = {
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
 
     // stage_counts only tracks active (non-outcome) leads in the date range
-    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, DemoBooked: 0, Callback: 0 };
+    const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, DemoBooked: 0, Callback: 0, Failed: 0 };
     const phones = new Set();
+    let convertedInRange = 0;
+    let lostInRange = 0;
 
     const filteredData = (data || []).filter(row => {
       const r = row as any;
@@ -445,27 +449,29 @@ export const dashboardService = {
 
     filteredData.forEach((row: any) => {
       const leadId = String(row[COLS.leads.id]);
-      // Converted/Lost leads are counted from outcomes table — skip here
-      if (convertedIds.has(leadId) || lostIds.has(leadId)) {
-        if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
-        return;
-      }
-      const sent = normalizeSentiment(row[COLS.leads.sentiment]);
+      if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
+      // Converted/Lost leads are counted from outcomes table — skip stage_counts
+      if (convertedIds.has(leadId)) { convertedInRange++; return; }
+      if (lostIds.has(leadId)) { lostInRange++; return; }
       const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
       if (rawSt === 'demo_booked') {
         stage_counts.DemoBooked++;
       } else if (rawSt === 'call_back' || rawSt === 'callback') {
         stage_counts.Callback++;
+      } else if (['failed', 'error', 'no answer', 'no_answer'].includes(rawSt)) {
+        stage_counts.Failed++;
       } else {
+        const sent = normalizeSentiment(row[COLS.leads.sentiment]);
         stage_counts[sent] = (stage_counts[sent] || 0) + 1;
       }
-      if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
     });
 
     const total = filteredData.length;
     // Converted/Lost come directly from outcomes table — permanent, date-agnostic
     const convertedCount = convertedIds.size;
     const lostCount = lostIds.size;
+    // Pending = all leads in range that are not converted or lost
+    const pendingCount = total - convertedInRange - lostInRange;
     const bucket_counts = {
       all: total,
       Hot: stage_counts.Hot,
@@ -475,7 +481,8 @@ export const dashboardService = {
       Lost: lostCount,
       DemoBooked: stage_counts.DemoBooked,
       Callback: stage_counts.Callback,
-      Pending: total - stage_counts.Hot - stage_counts.Warm - stage_counts.Cold - stage_counts.DemoBooked - stage_counts.Callback,
+      Failed: stage_counts.Failed,
+      Pending: pendingCount,
     };
     console.log('[metrics] bucket_counts:', JSON.stringify(bucket_counts));
     return {
