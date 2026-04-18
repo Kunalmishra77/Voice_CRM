@@ -599,6 +599,48 @@ export const liveCallService = {
   },
 };
 
+// ─── Debug Service ──────────────────────────────────────────────
+export const debugService = {
+  getTimestampDiagnosis: async () => {
+    const IST_TODAY = new Date(Date.now() + IST_OFFSET_MS).toISOString().substring(0, 10);
+    const { data, error } = await supabase
+      .from(LEADS_TABLE)
+      .select(`${COLS.leads.id}, ${COLS.leads.timestamp}, ${COLS.leads.status}`)
+      .limit(10000);
+    if (error) throw error;
+
+    const dateDist: Record<string, number> = {};
+    const todaySamples: any[] = [];
+    const nullSamples: any[] = [];
+
+    (data || []).forEach((r: any) => {
+      const raw = r[COLS.leads.timestamp];
+      const parsed = parseCallDateTime(raw);
+      const callDate = parsed ? parsed.substring(0, 10) : '1970-01-01';
+      dateDist[callDate] = (dateDist[callDate] || 0) + 1;
+      if (callDate === IST_TODAY && todaySamples.length < 10) {
+        todaySamples.push({ id: r[COLS.leads.id], raw, parsed, callDate });
+      }
+      if (!parsed && nullSamples.length < 10) {
+        nullSamples.push({ id: r[COLS.leads.id], raw });
+      }
+    });
+
+    const sortedDist = Object.entries(dateDist)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 30)
+      .map(([date, count]) => ({ date, count }));
+
+    return {
+      ist_today: IST_TODAY,
+      total_records: (data || []).length,
+      date_distribution: sortedDist,
+      today_sample_raw_timestamps: todaySamples,
+      null_parse_sample: nullSamples,
+    };
+  }
+};
+
 // ─── Employee System (Supabase-backed with fallback) ────────────
 const EMPLOYEES_TABLE = 'crm_employees';
 
