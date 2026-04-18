@@ -168,7 +168,8 @@ export const conversationService = {
 
     const allRows = (data || [])
       .map(row => {
-        const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) || new Date().toISOString();
+        const callTimestamp = parseCallDateTime(row[COLS.leads.timestamp]) ?? null;
+        const callTimestampDisplay = callTimestamp || '1970-01-01T00:00:00.000Z';
         return {
           ...row,
           "Phone Number": row[COLS.leads.phone],
@@ -180,7 +181,7 @@ export const conversationService = {
           "Bot Response": 'Voice Intercept',
           "Conversation Stage": row[COLS.leads.status],
           "recording_url": row[COLS.leads.recording] || null,
-          "callDate": callTimestamp.substring(0, 10)
+          "callDate": callTimestampDisplay.substring(0, 10)
         };
       })
       // Sort newest first by parsed call date then by Leadid desc
@@ -275,7 +276,8 @@ export const leadService = {
       .map(row => {
         const r = row as any;
         const leadId = String(r[COLS.leads.id]);
-        const callTimestamp = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+        const callTimestamp = parseCallDateTime(r[COLS.leads.timestamp]);
+        const callDateStr = callTimestamp ? callTimestamp.substring(0, 10) : '1970-01-01';
         // Derive effective status from outcomes table (source of truth)
         const effectiveStatus = convertedLeadIds.has(leadId) ? CRM_CONVERTED
           : lostLeadIds.has(leadId) ? CRM_LOST
@@ -295,7 +297,7 @@ export const leadService = {
           "CallTimestamp": callTimestamp,
           "created_at": callTimestamp,
           "duration": parseDuration(r[COLS.leads.duration]),
-          "callDate": callTimestamp.substring(0, 10),
+          "callDate": callDateStr,
           "lead_type": r[COLS.leads.lead_type] || null
         };
       })
@@ -434,7 +436,8 @@ export const dashboardService = {
     const filteredData = (data || []).filter(row => {
       const r = row as any;
       if (date_from || date_to) {
-        const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+        const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
+        if (!callTs) return false; // no parseable timestamp — exclude from all date-filtered views
         const callDate = callTs.substring(0, 10);
         if (date_from && callDate < date_from) return false;
         if (date_to && callDate > date_to) return false;
@@ -516,7 +519,8 @@ function normalizeCallStatus(raw: any): 'queued' | 'calling' | 'completed' | 'fa
 export const liveCallService = {
   // Get current call activity — no created_at column, use parsed call_date_time for today filter
   getCallActivity: async () => {
-    const today = new Date().toISOString().substring(0, 10);
+    // Use IST date for "today" — server is UTC but calls are logged in IST
+    const todayIST = new Date(Date.now() + IST_OFFSET_MS).toISOString().substring(0, 10);
     const { data, error } = await supabase
       .from(LEADS_TABLE)
       .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
@@ -525,7 +529,7 @@ export const liveCallService = {
     if (error) { console.error('[live] error:', error.message); throw error; }
 
     const allRows = (data || []).map((r: any) => {
-      const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();
+      const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || '1970-01-01T00:00:00.000Z';
       return {
         id: String(r[COLS.leads.id]),
         name: r[COLS.leads.name] || 'Unknown',
@@ -540,7 +544,7 @@ export const liveCallService = {
     });
 
     // Only show today's rows in live monitor
-    const rows = allRows.filter(r => r.callDate === today);
+    const rows = allRows.filter(r => r.callDate === todayIST);
 
     const queued = rows.filter(r => r.call_status === 'queued');
     const calling = rows.filter(r => r.call_status === 'calling');
