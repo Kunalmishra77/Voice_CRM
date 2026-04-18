@@ -81,58 +81,66 @@ function hasTimezone(s: string): boolean {
  */
 function parseCallDateTime(s: string): string | null {
   if (!s || typeof s !== 'string' || s.trim() === '') return null;
+  const raw = s.trim();
   try {
+    // ── Epoch milliseconds (e.g. "1744377000000") ────────────────────────
+    if (/^\d{10,13}$/.test(raw)) {
+      const ms = raw.length === 13 ? Number(raw) : Number(raw) * 1000;
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+
     // ── SQL datetime "YYYY-MM-DD HH:MM:SS" or date-only "YYYY-MM-DD" ────────
-    // Stored without TZ → treat as IST wall-clock time.
-    if (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(s.trim())) {
-      const iso = s.trim().replace(' ', 'T');
-      const d = new Date(iso); // Node treats bare ISO as UTC
-      if (!isNaN(d.getTime())) {
-        return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
-      }
+    if (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(raw)) {
+      const d = new Date(raw.replace(' ', 'T'));
+      if (!isNaN(d.getTime())) return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
       return null;
     }
 
-    // ── Already ISO (e.g. "2026-03-12T14:00:00.000Z" or "…+05:30") ──────
-    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
-      const d = new Date(s);
+    // ── Already ISO with T (e.g. "2026-03-12T14:00:00.000Z" or "+05:30") ─
+    if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+      const d = new Date(raw);
       if (isNaN(d.getTime())) return null;
-      // ISO without timezone treated as UTC by Node — if truly no TZ marker,
-      // assume IST and shift back so the stored UTC time is correct.
-      if (!hasTimezone(s)) {
-        return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
-      }
+      if (!hasTimezone(raw)) return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
       return d.toISOString();
     }
 
-    // ── JS Date.toString() from Google Apps Script ────────────────────────
-    // Example: "Tue Nov 03 2026 14:23:58 GMT+0530 (India Standard Time)"
-    // Has explicit GMT+0530 → new Date() converts correctly to UTC.
-    if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+[A-Za-z]{3}/i.test(s)) {
-      const d = new Date(s);
+    // ── Indian date formats: "DD/MM/YYYY" or "DD/MM/YYYY HH:MM" ─────────
+    // Indian convention is always DD/MM/YYYY (day first)
+    const indMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[T\s](\d{1,2}:\d{2}(?::\d{2})?))?/);
+    if (indMatch) {
+      const [, dd, mm, yyyy, time] = indMatch;
+      const iso = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}${time ? 'T' + time : 'T00:00:00'}`;
+      const d = new Date(iso);
+      if (!isNaN(d.getTime())) return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
+    }
+
+    // ── JS Date.toString() "Tue Nov 03 2026 14:23:58 GMT+0530 ..." ───────
+    if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+[A-Za-z]{3}/i.test(raw)) {
+      const d = new Date(raw);
       if (!isNaN(d.getTime())) return d.toISOString();
     }
 
     // ── Voice bot format: "2:00 pmThursday, 12 March 2026" ───────────────
-    // No timezone marker → time is IST wall-clock.
-    const dateMatch = s.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
-    const timeMatch = s.match(/(\d{1,2}:\d{2}\s*[ap]m)/i);
+    const dateMatch = raw.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+    const timeMatch = raw.match(/(\d{1,2}:\d{2}\s*[ap]m)/i);
     if (dateMatch && timeMatch) {
-      // Parsed as UTC on Vercel server; subtract IST offset to get correct UTC
       const naive = new Date(`${dateMatch[1]} ${timeMatch[1]}`);
-      if (!isNaN(naive.getTime())) {
-        return new Date(naive.getTime() - IST_OFFSET_MS).toISOString();
-      }
+      if (!isNaN(naive.getTime())) return new Date(naive.getTime() - IST_OFFSET_MS).toISOString();
     }
 
-    // ── Fallback: strip full day names and try native parse ───────────────
-    const cleaned = s.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*/gi, '');
+    // ── "Month DD, YYYY" or "DD Month YYYY" ─────────────────────────────
+    const monthNameMatch = raw.match(/([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+    if (monthNameMatch) {
+      const naive = new Date(monthNameMatch[1]);
+      if (!isNaN(naive.getTime())) return new Date(naive.getTime() - IST_OFFSET_MS).toISOString();
+    }
+
+    // ── Fallback: strip day names and try native parse ────────────────────
+    const cleaned = raw.replace(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*/gi, '');
     const d2 = new Date(cleaned);
     if (isNaN(d2.getTime())) return null;
-    // If no explicit TZ info in the cleaned string, assume IST
-    if (!hasTimezone(cleaned)) {
-      return new Date(d2.getTime() - IST_OFFSET_MS).toISOString();
-    }
+    if (!hasTimezone(cleaned)) return new Date(d2.getTime() - IST_OFFSET_MS).toISOString();
     return d2.toISOString();
   } catch (e) {
     return null;
@@ -319,9 +327,13 @@ export const leadService = {
         return parseInt(String(b[COLS.leads.id] || 0)) - parseInt(String(a[COLS.leads.id] || 0));
       });
 
-    // 1. Filter by Date (skip for Converted/Lost — permanent outcomes are date-agnostic)
-    const isOutcomeBucket = stage === 'Converted' || stage === 'Lost';
-    let filtered = isOutcomeBucket ? allRows : allRows.filter(row => {
+    // 1. Filter by Date
+    // Converted/Lost/Failed: date-agnostic — always show all regardless of range
+    // Records with no parseable timestamp (callDate='1970-01-01'): bypass date filter
+    //   — can't filter what has no date; they always appear in every view
+    const isDateAgnosticBucket = stage === 'Converted' || stage === 'Lost' || stage === 'Failed';
+    let filtered = isDateAgnosticBucket ? allRows : allRows.filter(row => {
+      if (row.callDate === '1970-01-01') return true; // no timestamp — always include
       if (date_from && row.callDate < date_from) return false;
       if (date_to && row.callDate > date_to) return false;
       return true;
@@ -452,8 +464,8 @@ export const dashboardService = {
       const r = row as any;
       if (date_from || date_to) {
         const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
-        // Null timestamp → use epoch so it passes allTime but is excluded by any real date range
-        const callDate = callTs ? callTs.substring(0, 10) : '1970-01-01';
+        if (!callTs) return true; // no parseable timestamp — always count in totals
+        const callDate = callTs.substring(0, 10);
         if (date_from && callDate < date_from) return false;
         if (date_to && callDate > date_to) return false;
       }
