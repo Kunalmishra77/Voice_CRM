@@ -331,9 +331,9 @@ export const leadService = {
     // Converted/Lost/Failed: date-agnostic — always show all regardless of range
     // Records with no parseable timestamp (callDate='1970-01-01'): bypass date filter
     //   — can't filter what has no date; they always appear in every view
+    // Converted/Lost/Failed: date-agnostic — always show all regardless of range
     const isDateAgnosticBucket = stage === 'Converted' || stage === 'Lost' || stage === 'Failed';
     let filtered = isDateAgnosticBucket ? allRows : allRows.filter(row => {
-      if (row.callDate === '1970-01-01') return true; // no timestamp — always include
       if (date_from && row.callDate < date_from) return false;
       if (date_to && row.callDate > date_to) return false;
       return true;
@@ -464,8 +464,7 @@ export const dashboardService = {
       const r = row as any;
       if (date_from || date_to) {
         const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
-        if (!callTs) return true; // no parseable timestamp — always count in totals
-        const callDate = callTs.substring(0, 10);
+        const callDate = callTs ? callTs.substring(0, 10) : '1970-01-01';
         if (date_from && callDate < date_from) return false;
         if (date_to && callDate > date_to) return false;
       }

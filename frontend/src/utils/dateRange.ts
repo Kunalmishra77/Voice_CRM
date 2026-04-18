@@ -60,7 +60,7 @@ export const getRangeFromPreset = (preset: DatePreset, now: Date = new Date()): 
       to = endOfYear(now);
       break;
     case 'allTime':
-      from = new Date(2000, 0, 1);
+      from = new Date(0); // epoch = '1970-01-01' — matches null-timestamp sentinel
       to = new Date(2100, 11, 31);
       break;
     case 'custom':
