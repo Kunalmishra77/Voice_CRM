@@ -82,6 +82,17 @@ function hasTimezone(s: string): boolean {
 function parseCallDateTime(s: string): string | null {
   if (!s || typeof s !== 'string' || s.trim() === '') return null;
   try {
+    // ── SQL datetime "YYYY-MM-DD HH:MM:SS" or date-only "YYYY-MM-DD" ────────
+    // Stored without TZ → treat as IST wall-clock time.
+    if (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(s.trim())) {
+      const iso = s.trim().replace(' ', 'T');
+      const d = new Date(iso); // Node treats bare ISO as UTC
+      if (!isNaN(d.getTime())) {
+        return new Date(d.getTime() - IST_OFFSET_MS).toISOString();
+      }
+      return null;
+    }
+
     // ── Already ISO (e.g. "2026-03-12T14:00:00.000Z" or "…+05:30") ──────
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
       const d = new Date(s);
@@ -437,8 +448,8 @@ export const dashboardService = {
       const r = row as any;
       if (date_from || date_to) {
         const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
-        if (!callTs) return false; // no parseable timestamp — exclude from all date-filtered views
-        const callDate = callTs.substring(0, 10);
+        // Null timestamp → use epoch so it passes allTime but is excluded by any real date range
+        const callDate = callTs ? callTs.substring(0, 10) : '1970-01-01';
         if (date_from && callDate < date_from) return false;
         if (date_to && callDate > date_to) return false;
       }
