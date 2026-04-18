@@ -280,7 +280,8 @@ export const leadService = {
     console.log('[leads] outcomes loaded — converted:', convertedLeadIds.size, 'lost:', lostLeadIds.size);
 
     // No created_at column — fetch all rows, filter by parsed call_date_time in memory
-    const { data, error } = await query;
+    // .limit(10000) overrides PostgREST's default 1000-row cap
+    const { data, error } = await query.limit(10000);
     if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
 
     const allRows = (data || [])
@@ -433,10 +434,13 @@ export const dashboardService = {
     console.log('[metrics] outcomes loaded — converted:', convertedIds.size, 'lost:', lostIds.size);
 
     // Fetch all leads, filter by call date + lead_type in memory
+    // .limit(10000) overrides PostgREST's default 1000-row cap
     const { data, error } = await supabase
       .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead"`);
+      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead"`)
+      .limit(10000);
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
+    const db_total = (data || []).length; // raw DB row count — always 100% of leads, ignores date filter
 
     // stage_counts only tracks active (non-outcome) leads in the date range
     const stage_counts: any = { Hot: 0, Warm: 0, Cold: 0, DemoBooked: 0, Callback: 0, Failed: 0 };
@@ -498,9 +502,10 @@ export const dashboardService = {
       Failed: stage_counts.Failed,
       Pending: pendingCount,
     };
-    console.log('[metrics] bucket_counts:', JSON.stringify(bucket_counts));
+    console.log('[metrics] db_total:', db_total, 'filtered_total:', total, 'bucket_counts:', JSON.stringify(bucket_counts));
     return {
-      total_leads: total,
+      total_leads: db_total,   // always the full DB count — never filtered by date
+      filtered_total: total,   // count within the selected date range
       unique_phones: phones.size,
       stage_counts: { ...stage_counts, Converted: convertedCount, Lost: lostCount },
       bucket_counts
