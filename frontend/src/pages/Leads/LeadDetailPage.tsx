@@ -236,6 +236,7 @@ const LeadDetailPage: React.FC = () => {
             <div className="space-y-4 pt-6 border-t border-border">
                {[
                  { label: 'Phone', value: lead['Phone Number'], icon: Phone },
+                 { label: 'Lead Type', value: (lead as any).lead_type || 'Eligible', icon: UserCheck },
                  { label: 'Owner', value: lead.owner || 'Unassigned', icon: UserCheck },
                  { label: 'Status', value: lead.status || lead['lead stage'], icon: Activity },
                  { label: 'Last Contact', value: (() => {

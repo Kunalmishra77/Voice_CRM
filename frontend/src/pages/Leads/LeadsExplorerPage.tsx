@@ -842,9 +842,16 @@ const LeadsExplorerPage: React.FC = () => {
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-semibold text-xs bg-gradient-to-br from-primary to-primary/70 shadow-[0_4px_12px_rgba(var(--brand-rgb),0.3)]">{lead['User Name']?.[0]}</div>
-                              <div className="flex flex-col">
+                              <div className="flex flex-col gap-0.5">
                                 <span className="text-sm font-semibold text-foreground">{lead['User Name']}</span>
-                                <span className="text-xs text-muted-foreground">{lead['Phone Number']}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">{lead['Phone Number']}</span>
+                                  {(lead as any).lead_type === 'Not Interested' ? (
+                                    <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-rose-500/15 text-rose-400 border-rose-500/20">Not Interested</Badge>
+                                  ) : (lead as any).lead_type === 'Non Eligible' ? (
+                                    <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-400 border-amber-500/20">Non-Eligible</Badge>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                           </td>

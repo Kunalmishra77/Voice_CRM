@@ -9,14 +9,16 @@ interface GlobalFiltersState {
   searchQuery: string;
   selectedAgent: string | null;
   selectedStage: string | null;
-  lastUpdated: number; // Added to force refresh
-  
+  leadType: 'all' | 'eligible' | 'non-eligible' | 'not-interested';
+  lastUpdated: number;
+
   // Actions
   setDatePreset: (preset: DatePreset) => void;
   setDateRange: (range: DateRange) => void;
   setSearchQuery: (query: string) => void;
   setSelectedAgent: (agent: string | null) => void;
   setSelectedStage: (stage: string | null) => void;
+  setLeadType: (type: 'all' | 'eligible' | 'non-eligible' | 'not-interested') => void;
   resetFilters: () => void;
 }
 
@@ -31,7 +33,10 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
       searchQuery: '',
       selectedAgent: null,
       selectedStage: null,
+      leadType: 'all',
       lastUpdated: Date.now(),
+
+      setLeadType: (type: 'all' | 'eligible' | 'non-eligible' | 'not-interested') => set({ leadType: type, lastUpdated: Date.now() }),
 
       setDatePreset: (preset) => {
         if (preset === 'custom') {
@@ -56,6 +61,7 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
         searchQuery: '',
         selectedAgent: null,
         selectedStage: null,
+        leadType: 'all',
         lastUpdated: Date.now(),
       }),
     }),

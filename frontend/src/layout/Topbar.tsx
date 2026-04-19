@@ -18,7 +18,8 @@ import {
   ClipboardList,
   Flame,
   Trash2,
-  XCircle
+  XCircle,
+  Filter
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { toast } from 'sonner';
@@ -50,7 +51,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
     setDatePreset,
     setDateRange,
     searchQuery,
-    setSearchQuery
+    setSearchQuery,
+    leadType,
+    setLeadType,
   } = useGlobalFilters();
 
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -129,6 +132,48 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
 
       {/* Right actions */}
       <div className="flex items-center gap-2 md:gap-3 ml-auto">
+
+        {/* Lead Type Filter */}
+        <CustomDropdownMenu
+          align="right"
+          trigger={
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "rounded-xl flex items-center gap-2 px-3.5 h-9 bg-card hover:bg-accent border-border shadow-sm transition-all",
+                leadType !== 'all' ? "border-primary/40 text-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Filter size={13} className={leadType !== 'all' ? 'text-primary' : 'text-muted-foreground'} />
+              <span className="text-sm font-medium hidden sm:inline">
+                {leadType === 'all' ? 'All Leads' : leadType === 'eligible' ? 'Eligible' : leadType === 'non-eligible' ? 'Non-Eligible' : 'Not Interested'}
+              </span>
+              {leadType !== 'all' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
+            </Button>
+          }
+        >
+          <div className="p-1 min-w-[160px]">
+            <div className="px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Lead Type</div>
+            {([
+              { value: 'all' as const, label: 'All Leads' },
+              { value: 'eligible' as const, label: 'Eligible' },
+              { value: 'non-eligible' as const, label: 'Non-Eligible' },
+              { value: 'not-interested' as const, label: 'Not Interested' },
+            ]).map(opt => (
+              <DropdownMenuItem
+                key={opt.value}
+                onClick={() => { setLeadType(opt.value); toast.success(`Showing ${opt.label}`); }}
+                className={leadType === opt.value ? 'bg-accent text-primary font-semibold' : 'text-muted-foreground'}
+              >
+                {opt.label}
+              </DropdownMenuItem>
+            ))}
+          </div>
+        </CustomDropdownMenu>
+
         {/* Date Range Picker */}
         <CustomDropdownMenu
           align="right"
