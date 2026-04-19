@@ -156,7 +156,7 @@ export class BackendProvider implements IDataProvider {
         const dayStr = safeFormat(day, 'yyyy-MM-dd');
         const rows = byDate[dayStr] || [];
         if (isConvertedBucket) {
-          return { name: safeFormat(day, 'MMM dd'), hot: 0, warm: 0, cold: 0, converted: rows.length, lost: 0, from: dayStr, to: dayStr };
+          return { name: safeFormat(day, 'MMM dd'), hot: 0, warm: 0, cold: 0, converted: rows.length, lost: 0, failed: 0, from: dayStr, to: dayStr };
         }
         return {
           name: safeFormat(day, 'MMM dd'),
@@ -165,6 +165,7 @@ export class BackendProvider implements IDataProvider {
           cold: rows.filter((r: any) => r.sentiment === 'Cold').length,
           converted: 0,
           lost: rows.length,
+          failed: 0,
           from: dayStr,
           to: dayStr
         };
@@ -224,6 +225,7 @@ export class BackendProvider implements IDataProvider {
       const dayStr = safeFormat(day, 'yyyy-MM-dd');
       const dayLeads = leadsWithDayStrings.filter(l => l.dayString === dayStr);
 
+      const FAILED_STATUSES = ['failed', 'error', 'no answer', 'no_answer'];
       const pending = dayLeads.filter(l => normalizeStatus(l.status) === 'Pending');
       return {
         name: safeFormat(day, 'MMM dd'),
@@ -232,6 +234,7 @@ export class BackendProvider implements IDataProvider {
         cold: pending.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
         converted: dayLeads.filter(l => normalizeStatus(l.status) === 'Converted').length,
         lost: dayLeads.filter(l => normalizeStatus(l.status) === 'Lost').length,
+        failed: dayLeads.filter(l => FAILED_STATUSES.includes((l.status || l['lead stage'] || '').toLowerCase())).length,
         from: dayStr,
         to: dayStr
       };

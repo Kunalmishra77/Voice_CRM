@@ -49,6 +49,7 @@ export interface TrendPoint {
   cold: number;
   converted: number;
   lost: number;
+  failed: number;
   from: string;
   to: string;
 }

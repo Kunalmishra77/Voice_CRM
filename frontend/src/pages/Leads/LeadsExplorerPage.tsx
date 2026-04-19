@@ -340,7 +340,11 @@ const LeadsExplorerPage: React.FC = () => {
       return [{ name: 'Converted', value: 100, color: COLORS.Converted }];
     }
 
-    if (bucket === 'Pending' || bucket === 'DemoBooked' || bucket === 'Callback' || bucket === 'Failed') {
+    if (bucket === 'Failed') {
+      return total > 0 ? [{ name: 'Failed / Missed', value: 100, color: COLORS.Failed }] : [];
+    }
+
+    if (bucket === 'Pending' || bucket === 'DemoBooked' || bucket === 'Callback') {
       const hotCount = source.filter(l => l.sentiment === 'Hot').length;
       const warmCount = source.filter(l => l.sentiment === 'Warm').length;
       const coldCount = source.filter(l => l.sentiment === 'Cold').length;
@@ -358,7 +362,7 @@ const LeadsExplorerPage: React.FC = () => {
   /* ─── Check if trend has any data ─── */
   const trendHasData = useMemo(() => {
     if (!trendData?.length) return false;
-    return trendData.some(p => p.hot + p.warm + p.cold + p.converted + p.lost > 0);
+    return trendData.some(p => p.hot + p.warm + p.cold + p.converted + p.lost + (p.failed || 0) > 0);
   }, [trendData]);
 
   /* ─── Bar chart: which bars to show based on bucket ─── */
@@ -370,7 +374,8 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Converted') return ['converted'];
     if (bucket === 'Lost') return ['hot', 'warm', 'cold'];
     if (bucket === 'Pending') return ['hot', 'warm', 'cold'];
-    if (bucket === 'DemoBooked' || bucket === 'Callback' || bucket === 'Failed') return ['hot', 'warm', 'cold'];
+    if (bucket === 'DemoBooked' || bucket === 'Callback') return ['hot', 'warm', 'cold'];
+    if (bucket === 'Failed') return ['failed'];
     return ['hot', 'warm', 'cold', 'converted', 'lost'];
   }, [bucket]);
 
@@ -513,7 +518,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Pending') return 'Sentiment of pending leads';
     if (bucket === 'DemoBooked') return 'Sentiment of demo-booked leads';
     if (bucket === 'Callback') return 'Sentiment of callback leads';
-    if (bucket === 'Failed') return 'Sentiment of failed / missed calls';
+    if (bucket === 'Failed') return 'Failed / Missed call volume';
     if (['Hot', 'Warm', 'Cold', 'Converted'].includes(bucket)) return `${bucket} leads only`;
     return 'Lead distribution';
   }, [bucket]);
@@ -655,6 +660,10 @@ const LeadsExplorerPage: React.FC = () => {
                               <stop offset="0%" stopColor="#64748b" stopOpacity={1}/>
                               <stop offset="100%" stopColor="#64748b" stopOpacity={0.6}/>
                             </linearGradient>
+                            <linearGradient id="lBarFailed" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
+                              <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
+                            </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
@@ -679,6 +688,10 @@ const LeadsExplorerPage: React.FC = () => {
                           {visibleBars.includes('lost') && (
                             <Bar dataKey="lost" name="Lost" fill="url(#lBarLost)" radius={[4, 4, 0, 0]} barSize={20} stackId="a"
                               className="cursor-pointer" onClick={(data: any) => handleBarClick({ payload: data }, 'lost')} />
+                          )}
+                          {visibleBars.includes('failed') && (
+                            <Bar dataKey="failed" name="Failed / Missed" fill="url(#lBarFailed)" radius={[4, 4, 0, 0]} barSize={20} stackId="a"
+                              className="cursor-pointer" onClick={(data: any) => handleBarClick({ payload: data }, 'failed')} />
                           )}
                         </BarChart>
                       </ResponsiveContainer>
