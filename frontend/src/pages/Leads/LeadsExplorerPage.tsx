@@ -816,7 +816,8 @@ const LeadsExplorerPage: React.FC = () => {
                       const rawStatus = String((lead as any).status || (lead as any)['lead stage'] || '').toLowerCase().trim();
                       const isConverted = ['crm_converted', 'converted'].includes(rawStatus);
                       const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
-                      const isFinalized = isConverted || isLost;
+                      const isFailed = ['failed', 'error', 'no answer', 'no_answer'].includes(rawStatus);
+                      const isFinalized = isConverted || isLost || isFailed;
                       const isSelected = selectedIds.includes(lead.id);
                       return (
                         <tr key={lead.id} className={cn("group transition-colors cursor-pointer", isSelected ? "bg-primary/5" : "hover:bg-white/[0.02]")} onClick={() => navigate(`/leads/${lead.id}`)}>

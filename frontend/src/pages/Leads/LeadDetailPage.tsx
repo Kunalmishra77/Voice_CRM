@@ -103,8 +103,8 @@ const LeadDetailPage: React.FC = () => {
   const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
   const isDemoBooked = rawStatus === 'demo_booked';
   const isCallback = rawStatus === 'call_back' || rawStatus === 'callback';
-  const isMissed = rawStatus === 'failed';
-  const isFinalized = isConverted || isLost;
+  const isMissed = ['failed', 'error', 'no answer', 'no_answer'].includes(rawStatus);
+  const isFinalized = isConverted || isLost || isMissed;
 
   return (
     <PageShell>
