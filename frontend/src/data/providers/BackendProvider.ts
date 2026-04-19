@@ -69,7 +69,7 @@ export class BackendProvider implements IDataProvider {
     const dbTotal = stats.total_leads;           // full DB count — never date-filtered
     const filteredTotal = stats.filtered_total ?? dbTotal; // count in selected range
     return {
-      totalLeads: dbTotal,
+      totalLeads: filteredTotal,
       hotLeads: stats.bucket_counts?.['Hot'] || 0,
       warmLeads: stats.bucket_counts?.['Warm'] || 0,
       coldLeads: stats.bucket_counts?.['Cold'] || 0,
@@ -77,7 +77,13 @@ export class BackendProvider implements IDataProvider {
       converted: stats.bucket_counts?.['Converted'] || 0,
       unconverted: stats.bucket_counts?.['Lost'] || 0,
       pendingDecisions: stats.bucket_counts?.['Pending'] || 0,
-      avgScore: filteredTotal > 0 ? Math.round(((stats.bucket_counts?.['Hot'] || 0) * 90 + (stats.bucket_counts?.['Warm'] || 0) * 60 + (stats.bucket_counts?.['Cold'] || 0) * 30) / filteredTotal) : 0,
+      avgScore: (() => {
+        const h = stats.bucket_counts?.['Hot'] || 0;
+        const w = stats.bucket_counts?.['Warm'] || 0;
+        const c = stats.bucket_counts?.['Cold'] || 0;
+        const denom = h + w + c;
+        return denom > 0 ? Math.round((h * 90 + w * 60 + c * 30) / denom) : 0;
+      })(),
       demoBooked: stats.bucket_counts?.['DemoBooked'] || 0,
       callbacks: stats.bucket_counts?.['Callback'] || 0,
       failedCalls: stats.bucket_counts?.['Failed'] || 0,

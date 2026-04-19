@@ -329,9 +329,9 @@ export const leadService = {
 
     // 1. Filter by Date
     // Converted/Lost/Failed: date-agnostic — always show all regardless of range
-    // Records with no parseable timestamp (callDate='1970-01-01'): bypass date filter
-    //   — can't filter what has no date; they always appear in every view
-    // Converted/Lost/Failed: date-agnostic — always show all regardless of range
+    // Null-timestamp records get callDate='1970-01-01'; they are excluded from any range
+    //   where date_from > '1970-01-01' (daily/weekly/monthly) but included in allTime
+    //   (because allTime sends date_from='1970-01-01', so '1970-01-01' < '1970-01-01' is false)
     const isDateAgnosticBucket = stage === 'Converted' || stage === 'Lost' || stage === 'Failed';
     let filtered = isDateAgnosticBucket ? allRows : allRows.filter(row => {
       if (date_from && row.callDate < date_from) return false;
@@ -482,17 +482,15 @@ export const dashboardService = {
       // Converted/Lost leads are counted from outcomes table — skip stage_counts
       if (convertedIds.has(leadId)) { convertedInRange++; return; }
       if (lostIds.has(leadId)) { lostInRange++; return; }
+      // Status-based counts (mutually exclusive by status priority)
       const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
-      if (rawSt === 'demo_booked') {
-        stage_counts.DemoBooked++;
-      } else if (rawSt === 'call_back' || rawSt === 'callback') {
-        stage_counts.Callback++;
-      } else if (['failed', 'error', 'no answer', 'no_answer'].includes(rawSt)) {
-        stage_counts.Failed++;
-      } else {
-        const sent = normalizeSentiment(row[COLS.leads.sentiment]);
-        stage_counts[sent] = (stage_counts[sent] || 0) + 1;
-      }
+      if (rawSt === 'demo_booked') stage_counts.DemoBooked++;
+      else if (rawSt === 'call_back' || rawSt === 'callback') stage_counts.Callback++;
+      else if (['failed', 'error', 'no answer', 'no_answer'].includes(rawSt)) stage_counts.Failed++;
+      // Sentiment counted independently for ALL active leads regardless of call status
+      // A "Hot DemoBooked" lead contributes to both Hot and DemoBooked
+      const sent = normalizeSentiment(row[COLS.leads.sentiment]);
+      stage_counts[sent] = (stage_counts[sent] || 0) + 1;
     });
 
     const total = filteredData.length;

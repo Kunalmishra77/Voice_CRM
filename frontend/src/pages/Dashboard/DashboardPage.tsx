@@ -53,7 +53,7 @@ function getTimeframeRange(tf: string, globalRange: { from: string; to: string }
     case 'week': return { from: fmt(subDays(now, 6)), to: fmt(now) };
     case 'month': return { from: fmt(startOfMonth(now)), to: fmt(endOfMonth(now)) };
     case 'quarter': return { from: fmt(startOfQuarter(now)), to: fmt(endOfQuarter(now)) };
-    case 'all': return { from: '2000-01-01', to: '2100-12-31' };
+    case 'all': return { from: '1970-01-01', to: '2100-12-31' };
     default: return globalRange;
   }
 }
