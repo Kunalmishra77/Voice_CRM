@@ -218,12 +218,18 @@ const LeadDetailPage: React.FC = () => {
               <p className="text-xs font-semibold text-muted-foreground mt-3">ID: {lead.id}</p>
 
               <div className="flex gap-2 mt-6">
-                 <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'success'} size="sm" className="px-4 py-1 font-semibold">
-                    {lead.scoring.bucket}
-                 </Badge>
-                 <Badge variant="zinc" size="sm" className="px-4 py-1 font-semibold">
-                    Score: {lead.scoring.score}
-                 </Badge>
+                 {lead.scoring.bucket ? (
+                   <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'success'} size="sm" className="px-4 py-1 font-semibold">
+                     {lead.scoring.bucket}
+                   </Badge>
+                 ) : (
+                   <Badge variant="default" size="sm" className="px-4 py-1 font-semibold bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
+                 )}
+                 {lead.scoring.score > 0 && (
+                   <Badge variant="zinc" size="sm" className="px-4 py-1 font-semibold">
+                     Score: {lead.scoring.score}
+                   </Badge>
+                 )}
               </div>
             </div>
 
@@ -404,7 +410,9 @@ const LeadDetailPage: React.FC = () => {
                        <div className="p-5 rounded-2xl bg-secondary border border-border">
                           <p className="text-sm font-bold text-foreground">
                             {lead['Action to be taken'] || (
-                              lead.sentiment === 'Hot'
+                              !lead.sentiment
+                                ? 'Call failed — retry the call or verify the phone number before next attempt.'
+                                : lead.sentiment === 'Hot'
                                 ? 'Schedule a follow-up call within 24 hours — high intent, close the deal now.'
                                 : lead.sentiment === 'Warm'
                                 ? 'Send a personalised email with pricing details and schedule a demo within 3 days.'
@@ -416,6 +424,7 @@ const LeadDetailPage: React.FC = () => {
                  </div>
 
                  {(() => {
+                    if (!lead.sentiment) return null; // no sentiment bar for failed calls
                     const sentimentPct = lead.sentiment === 'Hot' ? 88 : lead.sentiment === 'Warm' ? 55 : lead.sentiment === 'Cold' ? 22 : 50;
                     const barColor = lead.sentiment === 'Hot' ? 'bg-rose-500' : lead.sentiment === 'Cold' ? 'bg-blue-500' : lead.sentiment === 'Warm' ? 'bg-amber-500' : '';
                     const barStyle = !barColor ? { background: 'var(--brand-500)' } : {};
@@ -426,7 +435,7 @@ const LeadDetailPage: React.FC = () => {
                          </h3>
                          <div className="space-y-2">
                             <div className="flex justify-between items-center mb-1">
-                               <span className="text-xs font-semibold text-muted-foreground" style={{ color: 'var(--brand-600)' }}>{lead.sentiment || 'Neutral'}</span>
+                               <span className="text-xs font-semibold text-muted-foreground" style={{ color: 'var(--brand-600)' }}>{lead.sentiment}</span>
                                <span className="text-xs font-bold">{sentimentPct}%</span>
                             </div>
                             <div className="h-2 w-full bg-accent rounded-full overflow-hidden">

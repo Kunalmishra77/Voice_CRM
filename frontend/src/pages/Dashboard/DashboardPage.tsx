@@ -206,9 +206,13 @@ const RecentActivityTable = React.memo(({ recentLeads, navigate }: { recentLeads
                 </div>
               </td>
               <td className="px-4 py-3.5">
-                <Badge variant={lead.sentiment === 'Hot' ? 'danger' : lead.sentiment === 'Warm' ? 'warning' : 'info'} className="font-medium text-xs">
-                  {lead.sentiment}
-                </Badge>
+                {lead.sentiment ? (
+                  <Badge variant={lead.sentiment === 'Hot' ? 'danger' : lead.sentiment === 'Warm' ? 'warning' : 'info'} className="font-medium text-xs">
+                    {lead.sentiment}
+                  </Badge>
+                ) : (
+                  <Badge variant="default" className="font-medium text-xs bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
+                )}
               </td>
               <td className="px-4 py-3.5 text-center text-sm font-medium text-foreground tabular-nums">{lead.duration}s</td>
               <td className="px-4 py-3.5 text-right text-sm text-muted-foreground">
@@ -618,7 +622,11 @@ const DashboardPage: React.FC = () => {
                       <span className="text-xs text-muted-foreground">{l['Phone Number']}</span>
                     </div>
                   </div>
-                  <Badge variant={l.scoring?.bucket === 'Hot' ? 'danger' : l.scoring?.bucket === 'Warm' ? 'warning' : l.scoring?.bucket === 'Cold' ? 'info' : 'teal'} className="font-medium">{l.scoring?.bucket || l.sentiment}</Badge>
+                  {(l.scoring?.bucket || l.sentiment) ? (
+                    <Badge variant={l.scoring?.bucket === 'Hot' ? 'danger' : l.scoring?.bucket === 'Warm' ? 'warning' : l.scoring?.bucket === 'Cold' ? 'info' : 'teal'} className="font-medium">{l.scoring?.bucket || l.sentiment}</Badge>
+                  ) : (
+                    <Badge variant="default" className="font-medium bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
+                  )}
                 </motion.div>
               ))}
             </>

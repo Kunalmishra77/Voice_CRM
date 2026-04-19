@@ -254,7 +254,9 @@ export const conversationService = {
           "User Name": data[COLS.leads.name],
           "concern": data[COLS.leads.summary],
           "lead stage": data[COLS.leads.status],
-          "sentiment": normalizeSentiment(data[COLS.leads.sentiment]),
+          "sentiment": ['failed', 'error', 'no answer', 'no_answer'].includes(String(data[COLS.leads.status] || '').toLowerCase().trim())
+            ? null
+            : normalizeSentiment(data[COLS.leads.sentiment]),
           "Conversation Summary": data[COLS.leads.summary],
           "Action to be taken": null
       }
@@ -302,6 +304,8 @@ export const leadService = {
         const effectiveStatus = convertedLeadIds.has(leadId) ? CRM_CONVERTED
           : lostLeadIds.has(leadId) ? CRM_LOST
           : r[COLS.leads.status];
+        const rawCallStatus = String(r[COLS.leads.status] || '').toLowerCase().trim();
+        const isFailedCall = ['failed', 'error', 'no answer', 'no_answer'].includes(rawCallStatus);
         return {
           ...r,
           leadid: leadId,
@@ -310,7 +314,7 @@ export const leadService = {
           "User Name": r[COLS.leads.name],
           "concern": r[COLS.leads.summary],
           "lead stage": effectiveStatus,
-          "sentiment": normalizeSentiment(r[COLS.leads.sentiment]),
+          "sentiment": isFailedCall ? null : normalizeSentiment(r[COLS.leads.sentiment]),
           "Conversation Summary": r[COLS.leads.summary],
           "recording_url": r[COLS.leads.recording] || null,
           "Timestamp": r[COLS.leads.timestamp],
@@ -482,15 +486,17 @@ export const dashboardService = {
       // Converted/Lost leads are counted from outcomes table — skip stage_counts
       if (convertedIds.has(leadId)) { convertedInRange++; return; }
       if (lostIds.has(leadId)) { lostInRange++; return; }
-      // Status-based counts (mutually exclusive by status priority)
       const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+      const isFailedSt = ['failed', 'error', 'no answer', 'no_answer'].includes(rawSt);
       if (rawSt === 'demo_booked') stage_counts.DemoBooked++;
       else if (rawSt === 'call_back' || rawSt === 'callback') stage_counts.Callback++;
-      else if (['failed', 'error', 'no answer', 'no_answer'].includes(rawSt)) stage_counts.Failed++;
-      // Sentiment counted independently for ALL active leads regardless of call status
-      // A "Hot DemoBooked" lead contributes to both Hot and DemoBooked
-      const sent = normalizeSentiment(row[COLS.leads.sentiment]);
-      stage_counts[sent] = (stage_counts[sent] || 0) + 1;
+      else if (isFailedSt) stage_counts.Failed++;
+      // Sentiment only for calls that actually connected (done, demo_booked, callback)
+      // Failed calls had no conversation — no meaningful sentiment to assign
+      if (!isFailedSt) {
+        const sent = normalizeSentiment(row[COLS.leads.sentiment]);
+        stage_counts[sent] = (stage_counts[sent] || 0) + 1;
+      }
     });
 
     const total = filteredData.length;

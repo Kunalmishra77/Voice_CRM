@@ -170,8 +170,12 @@ const DrilldownTable: React.FC<{ leads: LeadInsightRow[]; title: string; onClose
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={l.sentiment === 'Hot' ? 'danger' : l.sentiment === 'Warm' ? 'warning' : l.sentiment === 'Cold' ? 'info' : 'default'}
-                  className="font-medium text-xs">{l.sentiment || l.scoring?.bucket}</Badge>
+                {l.sentiment ? (
+                  <Badge variant={l.sentiment === 'Hot' ? 'danger' : l.sentiment === 'Warm' ? 'warning' : l.sentiment === 'Cold' ? 'info' : 'default'}
+                    className="font-medium text-xs">{l.sentiment}</Badge>
+                ) : (
+                  <Badge variant="default" className="font-medium text-xs bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
+                )}
                 <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </motion.div>

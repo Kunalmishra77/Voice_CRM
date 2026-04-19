@@ -114,8 +114,8 @@ export class BackendProvider implements IDataProvider {
         })(),
         recording_url: l.recording_url || null,
         scoring: {
-            score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : 34,
-            bucket: l.sentiment,
+            score: l.sentiment === 'Hot' ? 92 : l.sentiment === 'Warm' ? 68 : l.sentiment === 'Cold' ? 34 : 0,
+            bucket: l.sentiment || null,
             reasons: []
         }
     }));
