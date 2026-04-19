@@ -67,7 +67,7 @@ function getTimeframeRange(tf: string, globalRange: { from: string; to: string }
     case 'week': return { from: fmt(startOfWeek(now, { weekStartsOn: 1 })), to: fmt(endOfWeek(now, { weekStartsOn: 1 })) };
     case 'month': return { from: fmt(startOfMonth(now)), to: fmt(endOfMonth(now)) };
     case 'quarter': return { from: fmt(startOfQuarter(now)), to: fmt(endOfQuarter(now)) };
-    case 'all': return { from: '2000-01-01', to: '2100-12-31' };
+    case 'all': return { from: '1970-01-01', to: '2100-12-31' };
     default: return globalRange;
   }
 }
@@ -479,7 +479,7 @@ const LeadsExplorerPage: React.FC = () => {
     } else if (type === 'transcripts_all') {
       downloadTranscripts(leads || [], `transcripts_${bucket}_${today}`);
     } else if (type === 'all') {
-      const all = await dataProvider.getLeads({ range: { from: '2000-01-01', to: '2100-01-01' }, bucket: 'all' });
+      const all = await dataProvider.getLeads({ range: { from: '1970-01-01', to: '2100-12-31' }, bucket: 'all' });
       downloadCSV(all, `all_leads_${today}`);
     } else if (['hot', 'warm', 'cold'].includes(type)) {
       const segment = await dataProvider.getLeads({ range, bucket: type.charAt(0).toUpperCase() + type.slice(1) });
@@ -848,7 +848,7 @@ const LeadsExplorerPage: React.FC = () => {
                                   <span className="text-xs text-muted-foreground">{lead['Phone Number']}</span>
                                   {(lead as any).lead_type === 'Not Interested' ? (
                                     <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-rose-500/15 text-rose-400 border-rose-500/20">Not Interested</Badge>
-                                  ) : (lead as any).lead_type === 'Non Eligible' ? (
+                                  ) : /non.?eligible/i.test((lead as any).lead_type || '') ? (
                                     <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-400 border-amber-500/20">Non-Eligible</Badge>
                                   ) : null}
                                 </div>

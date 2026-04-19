@@ -85,6 +85,7 @@ interface AssignmentOption {
 const ASSIGNMENT_OPTIONS: AssignmentOption[] = [
   // By Lead
   { value: 'specific', label: 'Specific Lead', desc: 'Pick one particular lead to assign', icon: Target, group: 'By Lead', color: 'text-primary' },
+  { value: 'multiple', label: 'Multiple Leads', desc: 'Pick any mix of Hot, Warm, Cold leads', icon: Layers, group: 'By Lead', color: 'text-purple-500' },
   // By Sentiment
   { value: 'hot', label: 'All Hot Leads', desc: 'High intent — needs immediate attention', icon: Flame, group: 'By Sentiment', color: 'text-rose-500' },
   { value: 'warm', label: 'All Warm Leads', desc: 'Moderate interest — nurture required', icon: Thermometer, group: 'By Sentiment', color: 'text-amber-500' },
@@ -227,6 +228,8 @@ const TasksFollowupsPage: React.FC = () => {
   const [leadSearch, setLeadSearch] = useState('');
   const [leadSentimentFilter, setLeadSentimentFilter] = useState<'all' | 'Hot' | 'Warm' | 'Cold'>('all');
   const [leadStatusFilter, setLeadStatusFilter] = useState<'all' | 'Pending' | 'Converted' | 'Lost'>('all');
+  // Multi-select: stores selected lead objects
+  const [selectedLeads, setSelectedLeads] = useState<Array<{ id: string; phone: string; name: string; sentiment: string }>>([]);
   const [newEmployee, setNewEmployee] = useState({ name: '', email: '', phone: '', department: '' });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
 
@@ -391,6 +394,32 @@ const TasksFollowupsPage: React.FC = () => {
         toast.error("Failed to create task.");
         return;
       }
+    } else if (assignmentType === 'multiple') {
+      if (selectedLeads.length === 0) {
+        toast.error("Please select at least one lead.");
+        return;
+      }
+      const bulkTasks = selectedLeads.map(l => ({
+        phone_number: l.phone,
+        lead_name: l.name,
+        lead_sentiment: l.sentiment || null,
+        lead_insights_id: parseInt(l.id) || undefined,
+        task_type: form.type,
+        due_at: new Date(form.due_at).toISOString(),
+        notes: form.notes || `${form.type} — manually selected leads`,
+        assigned_to: form.assigned_to,
+        assigned_by: 'Admin',
+        assignment_type: 'multiple',
+        priority: form.priority,
+        created_by: 'Admin',
+      }));
+      const result = await (dataProvider as any).createBulkTasks(bulkTasks);
+      if (result.success) {
+        toast.success(`${result.created} tasks created for ${selectedLeads.length} leads!`);
+      } else {
+        toast.error("Failed to create tasks.");
+        return;
+      }
     } else {
       // Bulk assignment
       if (bulkMatchingLeads.length === 0) {
@@ -509,6 +538,7 @@ const TasksFollowupsPage: React.FC = () => {
     setLeadSentimentFilter('all');
     setLeadStatusFilter('all');
     setAssignmentType('specific');
+    setSelectedLeads([]);
   };
 
   const openReschedule = (task: LeadTask) => {
@@ -758,7 +788,7 @@ const TasksFollowupsPage: React.FC = () => {
           </div>
 
           {/* Bulk info banner */}
-          {assignmentType !== 'specific' && (
+          {assignmentType !== 'specific' && assignmentType !== 'multiple' && (
             <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2">
                 <Zap size={14} className="text-primary" />
@@ -772,13 +802,37 @@ const TasksFollowupsPage: React.FC = () => {
             </div>
           )}
 
-          {/* 2) Lead Browser Panel (only for specific) */}
-          {assignmentType === 'specific' && (
+          {/* 2) Lead Browser Panel (specific = single, multiple = multi-checkbox) */}
+          {(assignmentType === 'specific' || assignmentType === 'multiple') && (
             <div className="space-y-3">
-              <label className="text-xs font-semibold text-muted-foreground pl-1">Select Lead</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground pl-1">
+                  {assignmentType === 'multiple' ? `Select Leads (${selectedLeads.length} selected)` : 'Select Lead'}
+                </label>
+                {assignmentType === 'multiple' && selectedLeads.length > 0 && (
+                  <button type="button" onClick={() => setSelectedLeads([])} className="text-[10px] font-bold text-rose-400 hover:text-rose-500">Clear all</button>
+                )}
+              </div>
 
-              {/* Selected lead chip */}
-              {form.phone && (
+              {/* Multi-select: chips of selected leads */}
+              {assignmentType === 'multiple' && selectedLeads.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-3 rounded-2xl bg-primary/5 border border-primary/20">
+                  {selectedLeads.map(l => (
+                    <div key={l.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold">
+                      <div className={cn("w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-bold text-white", l.sentiment === 'Hot' ? 'bg-rose-500' : l.sentiment === 'Cold' ? 'bg-blue-500' : 'bg-amber-500')}>
+                        {l.name[0]}
+                      </div>
+                      <span className="text-foreground max-w-[80px] truncate">{l.name}</span>
+                      <button type="button" onClick={() => setSelectedLeads(prev => prev.filter(x => x.id !== l.id))} className="text-muted-foreground hover:text-rose-400 ml-0.5">
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Single-select: selected lead chip */}
+              {assignmentType === 'specific' && form.phone && (
                 <div className="flex items-center gap-2 p-3 rounded-2xl bg-primary/5 border border-primary/20">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--brand-500), #34d399)' }}>
                     {form.lead_name?.[0] || '?'}
@@ -794,8 +848,8 @@ const TasksFollowupsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Lead browser (hidden when lead is selected) */}
-              {!form.phone && (
+              {/* Lead browser — shown always for multiple, hidden when single is picked */}
+              {(assignmentType === 'multiple' || !form.phone) && (
                 <div className="rounded-2xl border border-border bg-accent/30 overflow-hidden">
                   {/* Search bar */}
                   <div className="p-3 border-b border-border">
@@ -811,114 +865,92 @@ const TasksFollowupsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Filter row: Sentiment tabs + Status dropdown */}
+                  {/* Filter row */}
                   <div className="px-3 pt-2.5 pb-2 flex items-center gap-2 border-b border-border flex-wrap">
-                    {/* Sentiment tabs */}
                     <div className="flex bg-card p-0.5 rounded-xl border border-border">
                       {([['all', 'All'], ['Hot', 'Hot'], ['Warm', 'Warm'], ['Cold', 'Cold']] as const).map(([val, label]) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setLeadSentimentFilter(val)}
-                          className={cn(
-                            "px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1",
+                        <button key={val} type="button" onClick={() => setLeadSentimentFilter(val)}
+                          className={cn("px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1",
                             leadSentimentFilter === val
                               ? val === 'Hot' ? "bg-rose-500 text-white" : val === 'Warm' ? "bg-amber-500 text-white" : val === 'Cold' ? "bg-blue-500 text-white" : "bg-primary text-primary-foreground"
                               : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {val === 'Hot' && <Flame size={10} />}
-                          {val === 'Warm' && <Thermometer size={10} />}
-                          {val === 'Cold' && <Snowflake size={10} />}
-                          {label}
-                          <span className="text-[8px] opacity-80 ml-0.5">
-                            {val === 'all' ? leadFilterCounts.all : leadFilterCounts[val]}
-                          </span>
+                          )}>
+                          {val === 'Hot' && <Flame size={10} />}{val === 'Warm' && <Thermometer size={10} />}{val === 'Cold' && <Snowflake size={10} />}
+                          {label} <span className="text-[8px] opacity-80 ml-0.5">{val === 'all' ? leadFilterCounts.all : leadFilterCounts[val as 'Hot'|'Warm'|'Cold']}</span>
                         </button>
                       ))}
                     </div>
-
-                    {/* Status filter */}
                     <div className="flex bg-card p-0.5 rounded-xl border border-border ml-auto">
                       {([['all', 'All Status'], ['Pending', 'Pending'], ['Converted', 'Converted'], ['Lost', 'Lost']] as const).map(([val, label]) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setLeadStatusFilter(val)}
-                          className={cn(
-                            "px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all",
+                        <button key={val} type="button" onClick={() => setLeadStatusFilter(val)}
+                          className={cn("px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all",
                             leadStatusFilter === val
                               ? val === 'Converted' ? "bg-emerald-500 text-white" : val === 'Lost' ? "bg-slate-500 text-white" : val === 'Pending' ? "bg-orange-500 text-white" : "bg-primary text-primary-foreground"
                               : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {label}
-                        </button>
+                          )}>{label}</button>
                       ))}
                     </div>
                   </div>
 
                   {/* Scrollable lead list */}
-                  <div className="max-h-[200px] overflow-y-auto p-1.5">
+                  <div className="max-h-[220px] overflow-y-auto p-1.5">
                     {browsableLeads.length === 0 ? (
                       <div className="py-8 text-center">
                         <Search size={18} className="mx-auto text-muted-foreground mb-2" />
                         <p className="text-[10px] font-semibold text-muted-foreground">No leads match the current filters.</p>
                       </div>
-                    ) : (
-                      browsableLeads.map(l => {
-                        const status = normalizeStatus(l.status || l['lead stage']);
-                        return (
-                          <button
-                            key={l.id}
-                            type="button"
-                            onClick={() => {
+                    ) : browsableLeads.map(l => {
+                      const status = normalizeStatus(l.status || l['lead stage']);
+                      const isMultiSelected = assignmentType === 'multiple' && selectedLeads.some(s => s.id === l.id);
+                      return (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => {
+                            if (assignmentType === 'multiple') {
+                              setSelectedLeads(prev =>
+                                prev.some(s => s.id === l.id)
+                                  ? prev.filter(s => s.id !== l.id)
+                                  : [...prev, { id: l.id, phone: l['Phone Number'], name: l['User Name'], sentiment: l.sentiment || '' }]
+                              );
+                            } else {
                               setForm({ ...form, phone: l['Phone Number'], lead_name: l['User Name'], lead_sentiment: l.sentiment || '' });
                               setLeadSearch('');
-                            }}
-                            className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-card transition-all text-left group border border-transparent hover:border-border mb-0.5"
-                          >
-                            {/* Avatar */}
-                            <div className={cn(
-                              "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0",
-                              l.sentiment === 'Hot' ? "bg-rose-500" : l.sentiment === 'Cold' ? "bg-blue-500" : "bg-amber-500"
+                            }
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group border mb-0.5",
+                            isMultiSelected ? "bg-primary/5 border-primary/25" : "border-transparent hover:bg-card hover:border-border"
+                          )}
+                        >
+                          {/* Checkbox (multi) or avatar (single) */}
+                          {assignmentType === 'multiple' ? (
+                            <div className={cn("w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
+                              isMultiSelected ? "bg-primary border-primary" : "border-border"
                             )}>
-                              {l['User Name']?.[0] || '?'}
+                              {isMultiSelected && <Check size={11} className="text-white" />}
                             </div>
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-foreground truncate">{l['User Name']}</p>
-                              <p className="text-[9px] text-muted-foreground">{l['Phone Number']}</p>
-                            </div>
-
-                            {/* Badges */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Badge
-                                variant={l.sentiment === 'Hot' ? 'danger' : l.sentiment === 'Cold' ? 'success' : 'warning'}
-                                size="xs"
-                                className="text-[8px] px-1.5"
-                              >
-                                {l.sentiment}
-                              </Badge>
-                              <span className={cn(
-                                "text-[8px] font-bold px-1.5 py-0.5 rounded-full",
-                                status === 'Converted' ? "bg-emerald-500/10 text-emerald-600" :
-                                status === 'Lost' ? "bg-slate-500/10 text-slate-500" :
-                                "bg-orange-500/10 text-orange-600"
-                              )}>
-                                {status}
-                              </span>
-                            </div>
-
-                            {/* Select indicator */}
-                            <ArrowRight size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
-                          </button>
-                        );
-                      })
-                    )}
+                          ) : (
+                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0",
+                              l.sentiment === 'Hot' ? "bg-rose-500" : l.sentiment === 'Cold' ? "bg-blue-500" : "bg-amber-500"
+                            )}>{l['User Name']?.[0] || '?'}</div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-foreground truncate">{l['User Name']}</p>
+                            <p className="text-[9px] text-muted-foreground">{l['Phone Number']}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Badge variant={l.sentiment === 'Hot' ? 'danger' : l.sentiment === 'Cold' ? 'success' : 'warning'} size="xs" className="text-[8px] px-1.5">{l.sentiment}</Badge>
+                            <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded-full",
+                              status === 'Converted' ? "bg-emerald-500/10 text-emerald-600" : status === 'Lost' ? "bg-slate-500/10 text-slate-500" : "bg-orange-500/10 text-orange-600"
+                            )}>{status}</span>
+                          </div>
+                          {assignmentType === 'specific' && <ArrowRight size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />}
+                        </button>
+                      );
+                    })}
                     {browsableLeads.length >= 30 && (
-                      <p className="text-center text-[9px] text-muted-foreground py-2">Showing first 30 results. Use filters to narrow down.</p>
+                      <p className="text-center text-[9px] text-muted-foreground py-2">Showing first 30. Use filters to narrow down.</p>
                     )}
                   </div>
                 </div>

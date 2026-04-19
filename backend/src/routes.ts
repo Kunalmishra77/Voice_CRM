@@ -1,30 +1,11 @@
 import { Router } from 'express';
-import { conversationService, leadService, dashboardService, proxyService, taskService, employeeService, liveCallService, outcomeService, debugService } from './services.js';
+import { conversationService, leadService, dashboardService, proxyService, taskService, employeeService, liveCallService, outcomeService } from './services.js';
 
 const router = Router();
 
 // Health check
 router.get('/health', async (req, res) => {
   res.json({ ok: true, database: 'connected', signal: 'green' });
-});
-
-// Debug endpoint — echoes received query params (useful for Vercel diagnostics)
-router.get('/debug/echo', async (req, res) => {
-  res.json({
-    query: req.query,
-    url: req.url,
-    originalUrl: req.originalUrl,
-    path: req.path,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Debug endpoint — shows timestamp parsing distribution to diagnose "X leads showing as today"
-router.get('/debug/timestamps', async (req, res) => {
-  try {
-    const result = await debugService.getTimestampDiagnosis();
-    res.json(result);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // Metrics

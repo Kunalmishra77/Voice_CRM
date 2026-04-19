@@ -37,7 +37,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       style={{ height: containerHeight, minHeight: containerHeight }}
     >
       {isReady && (
-        <div className="absolute inset-0 w-full h-full animate-in fade-in duration-500 min-w-0 min-h-0">
+        <div className="absolute inset-0 w-full h-full animate-in fade-in duration-500" style={{ minWidth: 0, minHeight: 0 }}>
           {children}
         </div>
       )}

@@ -228,7 +228,7 @@ export class BackendProvider implements IDataProvider {
       return {
         name: safeFormat(day, 'MMM dd'),
         hot: pending.filter(l => (l.sentiment || '').toLowerCase() === 'hot').length,
-        warm: pending.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average' || !s; }).length,
+        warm: pending.filter(l => { const s = (l.sentiment || '').toLowerCase(); return s === 'warm' || s === 'average'; }).length,
         cold: pending.filter(l => (l.sentiment || '').toLowerCase() === 'cold').length,
         converted: dayLeads.filter(l => normalizeStatus(l.status) === 'Converted').length,
         lost: dayLeads.filter(l => normalizeStatus(l.status) === 'Lost').length,

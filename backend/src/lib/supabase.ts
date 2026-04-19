@@ -21,7 +21,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // Immediate Connectivity Test
-supabase.from('whatsapp_conversations').select('count', { count: 'exact', head: true }).limit(1)
+supabase.from('call_leads').select('count', { count: 'exact', head: true }).limit(1)
   .then(({ error }) => {
     if (error) {
       console.error('❌ Supabase Connection Test Failed:', error.message);

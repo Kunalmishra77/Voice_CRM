@@ -39,7 +39,6 @@ const NOT_INTERESTED_KEYWORDS: string[] = [
   // ── English ──────────────────────────────────────────────────────────────
   'not interested', 'no interest', 'not at all interested',
   'declined to speak', 'declined the offer', 'declined the call',
-  'declined.*speak',
   'not interested in learning', 'not interested in discussing',
   'not suitable', 'not relevant', 'not for me', 'not for us',
   'not a fit', 'not a good fit', 'not useful',
@@ -243,7 +242,7 @@ export const conversationService = {
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
     // No created_at column — fetch all, filter by parsed call_date_time in memory
-    const { data, error } = await query;
+    const { data, error } = await query.limit(10000);
     if (error) throw error;
 
     const allRows = (data || [])
@@ -439,7 +438,7 @@ export const leadService = {
       filtered = filtered.filter(l => {
         const lt = String(l.lead_type || '').toLowerCase().trim();
         if (lead_type === 'eligible') return lt === 'eligilble' || lt === 'eligible' || lt === 'eligble';
-        if (lead_type === 'non-eligible') return (lt === 'non eligible' || lt === 'non-eligible' || lt === 'ineligible' || lt === 'non_eligible') && lt !== 'not interested';
+        if (lead_type === 'non-eligible') return (lt === 'non eligible' || lt === 'non-eligible' || lt === 'ineligible' || lt === 'non_eligible');
         if (lead_type === 'not-interested') return lt === 'not interested';
         return true;
       });
@@ -625,7 +624,7 @@ export const liveCallService = {
     const { data, error } = await supabase
       .from(LEADS_TABLE)
       .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
-      .limit(500);
+      .limit(10000);
 
     if (error) { console.error('[live] error:', error.message); throw error; }
 

@@ -37,13 +37,19 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
     onSuccess: (res) => {
       if (res.success) {
         queryClient.invalidateQueries({ queryKey: ['leads-explorer'] });
+        queryClient.invalidateQueries({ queryKey: ['leads-table'] });
+        queryClient.invalidateQueries({ queryKey: ['leads-trend'] });
+        queryClient.invalidateQueries({ queryKey: ['leads-stage'] });
+        queryClient.invalidateQueries({ queryKey: ['leads-pie'] });
+        queryClient.invalidateQueries({ queryKey: ['lead-detail'] });
+        queryClient.invalidateQueries({ queryKey: ['outcomes'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-kpis'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-funnel'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-stage'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-call-pulse'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-call-trend'] });
         queryClient.invalidateQueries({ queryKey: ['call-insight-detail'] });
-        toast.success(`Saved ✅ ${type === 'Converted' ? 'Converted' : 'Unconverted'}`);
+        toast.success(`Saved ✅ ${type === 'Converted' ? 'Marked as Converted' : 'Marked as Lost'}`);
         onClose();
         setForm({ reason: '', note: '' });
       } else {
@@ -77,14 +83,14 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={type === 'Converted' ? 'Mark as Converted' : 'Mark as Unconverted'}
+      title={type === 'Converted' ? 'Mark as Converted' : 'Mark as Lost'}
       overflowHidden={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider pl-1">
-              {type === 'Converted' ? 'Conversion Reason' : 'Unconverted Reason'}
+              {type === 'Converted' ? 'Conversion Reason' : 'Lost Reason'}
             </label>
             <FixedDropdown
               options={type === 'Converted' ? [
@@ -112,7 +118,7 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider pl-1">
-              {type === 'Converted' ? 'Conversion Note' : 'Internal Note'}
+              {type === 'Converted' ? 'Conversion Note' : 'Lost Note'}
             </label>
             <textarea
               value={form.note}
@@ -125,7 +131,7 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
         </div>
         <div className="flex flex-col gap-3 pt-4">
           <Button type="submit" variant={type === 'Converted' ? 'primary' : 'danger'} className="w-full py-5 rounded-2xl shadow-xl" loading={updateStatusMutation.isPending}>
-            <Save size={18} className="mr-2" /> Confirm {type === 'Converted' ? 'Conversion' : 'Decision'}
+            <Save size={18} className="mr-2" /> Confirm {type === 'Converted' ? 'Conversion' : 'Mark as Lost'}
           </Button>
           <Button type="button" variant="ghost" className="w-full text-zinc-500 py-4" onClick={onClose}>
             Cancel

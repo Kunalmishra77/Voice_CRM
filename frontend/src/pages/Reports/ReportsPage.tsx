@@ -112,7 +112,7 @@ const ReportsPage: React.FC = () => {
         <SectionCard title="Lead Conversion Ratio" subtitle="Conversion efficiency analysis." icon={<PieIcon size={18} className="text-primary" />}>
           <ChartContainer height={300} className="relative w-full">
             {isLoading && <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10"><Loader2 className="animate-spin text-primary" /></div>}
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={data?.conversionRatio || []}
@@ -149,7 +149,7 @@ const ReportsPage: React.FC = () => {
         {/* Sentiment Distribution */}
         <SectionCard title="Sentiment Distribution" subtitle="Lead sentiment breakdown." icon={<Sparkles size={18} className="text-purple-500" />}>
           <ChartContainer height={300} className="w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={data?.sentimentSplit || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(120,120,120,0.08)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600, fill: 'var(--muted-foreground)' }} />
@@ -169,7 +169,7 @@ const ReportsPage: React.FC = () => {
         <div className="lg:col-span-2 pb-10">
           <SectionCard title="Performance Trend" subtitle="Leads to conversion over time." icon={<TrendingUp size={18} className="text-orange-500" />}>
             <ChartContainer height={350} className="w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={data?.performanceTrend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSig" x1="0" y1="0" x2="0" y2="1">
