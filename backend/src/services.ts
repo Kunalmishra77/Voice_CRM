@@ -104,13 +104,13 @@ function safeInt(v: any, fallback: number): number {
 }
 
 /** Normalize raw sentiment from DB to consistent capitalized form */
-function normalizeSentiment(raw: any): string {
-  if (!raw) return 'Warm';
+function normalizeSentiment(raw: any): string | null {
+  if (!raw) return null;
   const lower = String(raw).toLowerCase().trim();
   if (lower === 'hot') return 'Hot';
   if (lower === 'cold') return 'Cold';
   if (lower === 'warm' || lower === 'average') return 'Warm';
-  return 'Warm'; // fallback for unknown values
+  return null; // unknown or missing — no sentiment assigned
 }
 
 /** Normalize lead status to stable buckets (Converted, Lost, Pending) */
@@ -564,7 +564,7 @@ export const dashboardService = {
       // Failed calls had no conversation — no meaningful sentiment to assign
       if (!isFailedSt) {
         const sent = normalizeSentiment(row[COLS.leads.sentiment]);
-        stage_counts[sent] = (stage_counts[sent] || 0) + 1;
+        if (sent) stage_counts[sent] = (stage_counts[sent] || 0) + 1;
       }
     });
 
