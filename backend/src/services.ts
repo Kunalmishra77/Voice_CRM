@@ -643,19 +643,22 @@ export const liveCallService = {
       };
     });
 
-    // Only show today's rows in live monitor
-    const rows = allRows.filter(r => r.callDate === todayIST);
+    // Queued/calling leads may have no timestamp yet — always include them regardless of date
+    // Completed/failed: only show today's calls in the live monitor
+    const queued  = allRows.filter(r => r.call_status === 'queued');
+    const calling = allRows.filter(r => r.call_status === 'calling');
+    const todayRows = allRows.filter(r => r.callDate === todayIST);
+    const completed  = todayRows.filter(r => r.call_status === 'completed');
+    const failed     = todayRows.filter(r => r.call_status === 'failed');
+    const demoBooked = todayRows.filter(r => r.call_status === 'demo_booked');
+    const callback   = todayRows.filter(r => r.call_status === 'callback');
 
-    const queued = rows.filter(r => r.call_status === 'queued');
-    const calling = rows.filter(r => r.call_status === 'calling');
-    const completed = rows.filter(r => r.call_status === 'completed');
-    const failed = rows.filter(r => r.call_status === 'failed');
-    const demoBooked = rows.filter(r => r.call_status === 'demo_booked');
-    const callback = rows.filter(r => r.call_status === 'callback');
+    // total_today = today's completed/failed + all currently active
+    const totalToday = todayRows.length + queued.length + calling.length;
 
     return {
       summary: {
-        total_today: rows.length,
+        total_today: totalToday,
         queued: queued.length,
         calling: calling.length,
         completed: completed.length,
@@ -663,7 +666,6 @@ export const liveCallService = {
         demo_booked: demoBooked.length,
         callback: callback.length,
       },
-      // Return active calls (queued + calling) in full; completed includes demo_booked + callback
       active_calls: [...calling, ...queued],
       recent_completed: [...completed, ...demoBooked, ...callback].slice(0, 50),
       recent_failed: failed.slice(0, 20),

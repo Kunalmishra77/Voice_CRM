@@ -173,9 +173,9 @@ const DrilldownTable: React.FC<{ leads: LeadInsightRow[]; title: string; onClose
                 {l.sentiment ? (
                   <Badge variant={l.sentiment === 'Hot' ? 'danger' : l.sentiment === 'Warm' ? 'warning' : l.sentiment === 'Cold' ? 'info' : 'default'}
                     className="font-medium text-xs">{l.sentiment}</Badge>
-                ) : (
+                ) : ['failed', 'error', 'no answer', 'no_answer'].includes(((l as any).status || (l as any)['lead stage'] || '').toLowerCase()) ? (
                   <Badge variant="default" className="font-medium text-xs bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
-                )}
+                ) : null}
                 <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </motion.div>
@@ -848,8 +848,10 @@ const LeadsExplorerPage: React.FC = () => {
                               <Badge variant="default" className="font-medium text-xs bg-orange-500/15 text-orange-400 border-orange-500/20">Callback</Badge>
                             ) : rawStatus === 'failed' || rawStatus === 'no answer' || rawStatus === 'no_answer' || rawStatus === 'error' ? (
                               <Badge variant="default" className="font-medium text-xs bg-red-500/15 text-red-400 border-red-500/20">Failed</Badge>
+                            ) : lead.scoring.bucket ? (
+                              <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : lead.scoring.bucket === 'Cold' ? 'info' : 'default'} className="font-medium text-xs">{lead.scoring.bucket}</Badge>
                             ) : (
-                              <Badge variant={lead.scoring.bucket === 'Hot' ? 'danger' : lead.scoring.bucket === 'Warm' ? 'warning' : 'default'} className="font-medium text-xs">{lead.scoring.bucket}</Badge>
+                              <span className="text-xs text-muted-foreground/50">—</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
