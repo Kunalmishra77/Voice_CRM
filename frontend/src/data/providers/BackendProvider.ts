@@ -159,7 +159,7 @@ export class BackendProvider implements IDataProvider {
         const dayStr = safeFormat(day, 'yyyy-MM-dd');
         const rows = byDate[dayStr] || [];
         if (isConvertedBucket) {
-          return { name: safeFormat(day, 'MMM dd'), hot: 0, warm: 0, cold: 0, converted: rows.length, lost: 0, failed: 0, from: dayStr, to: dayStr };
+          return { name: safeFormat(day, 'MMM dd'), hot: 0, warm: 0, cold: 0, converted: rows.length, lost: 0, failed: 0, total: rows.length, from: dayStr, to: dayStr };
         }
         return {
           name: safeFormat(day, 'MMM dd'),
@@ -169,6 +169,7 @@ export class BackendProvider implements IDataProvider {
           converted: 0,
           lost: rows.length,
           failed: 0,
+          total: rows.length,
           from: dayStr,
           to: dayStr
         };
@@ -238,6 +239,7 @@ export class BackendProvider implements IDataProvider {
         converted: dayLeads.filter(l => normalizeStatus(l.status) === 'Converted').length,
         lost: dayLeads.filter(l => normalizeStatus(l.status) === 'Lost').length,
         failed: dayLeads.filter(l => FAILED_STATUSES.includes((l.status || l['lead stage'] || '').toLowerCase())).length,
+        total: dayLeads.length,
         from: dayStr,
         to: dayStr
       };

@@ -31,7 +31,8 @@ import {
 const COLORS: Record<string, string> = {
   Hot: '#ef4444', Warm: '#f59e0b', Cold: '#3b82f6',
   Converted: '#06b6d4', Lost: '#64748b', Pending: '#a855f7',
-  DemoBooked: '#8b5cf6', Callback: '#f97316', Failed: '#ef4444'
+  DemoBooked: '#8b5cf6', Callback: '#f97316', Failed: '#ef4444',
+  'Non-Eligible': '#f97316', 'Not Interested': '#94a3b8', Eligible: '#14b8a6', Total: '#8b5cf6'
 };
 
 const LOST_STATUSES = ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
@@ -321,6 +322,10 @@ const LeadsExplorerPage: React.FC = () => {
     if (!source || source.length === 0) return [];
     const total = source.length;
 
+    // Lead type overrides — these leads may have no sentiment, show a single segment
+    if (leadType === 'non-eligible') return [{ name: 'Non-Eligible', value: 100, color: COLORS['Non-Eligible'] }];
+    if (leadType === 'not-interested') return [{ name: 'Not Interested', value: 100, color: COLORS['Not Interested'] }];
+
     if (bucket === 'Lost') {
       const hotCount = source.filter(l => l.sentiment === 'Hot').length;
       const warmCount = source.filter(l => l.sentiment === 'Warm').length;
@@ -357,16 +362,18 @@ const LeadsExplorerPage: React.FC = () => {
 
     // All: use global stageDistro but filter out 0%
     return (stageDistro || []).filter(i => i.value > 0);
-  }, [effectiveLeads, bucket, stageDistro]);
+  }, [effectiveLeads, bucket, stageDistro, leadType]);
 
   /* ─── Check if trend has any data ─── */
   const trendHasData = useMemo(() => {
     if (!trendData?.length) return false;
-    return trendData.some(p => p.hot + p.warm + p.cold + p.converted + p.lost + (p.failed || 0) > 0);
+    return trendData.some(p => p.hot + p.warm + p.cold + p.converted + p.lost + (p.failed || 0) + (p.total || 0) > 0);
   }, [trendData]);
 
-  /* ─── Bar chart: which bars to show based on bucket ─── */
+  /* ─── Bar chart: which bars to show based on bucket and leadType ─── */
   const visibleBars = useMemo(() => {
+    // Lead types with no sentiment — show total count per day
+    if (leadType === 'non-eligible' || leadType === 'not-interested') return ['total'];
     if (bucket === 'all') return ['hot', 'warm', 'cold', 'converted', 'lost'];
     if (bucket === 'Hot') return ['hot'];
     if (bucket === 'Warm') return ['warm'];
@@ -377,7 +384,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'DemoBooked' || bucket === 'Callback') return ['hot', 'warm', 'cold'];
     if (bucket === 'Failed') return ['failed'];
     return ['hot', 'warm', 'cold', 'converted', 'lost'];
-  }, [bucket]);
+  }, [bucket, leadType]);
 
   /* ─── Drilldown handlers ─── */
   const handleBarClick = (data: any, barKey: string) => {
@@ -399,8 +406,10 @@ const LeadsExplorerPage: React.FC = () => {
       filtered = dayLeads.filter(l => LOST_STATUSES.includes((l.status as any)));
     } else if (barKey === 'failed') {
       filtered = dayLeads.filter(l => FAILED_STATUSES.includes((l['lead stage'] || l.status || '').toLowerCase()));
+    } else if (barKey === 'total') {
+      filtered = dayLeads;
     }
-    setDrilldown({ isOpen: true, title: `${capitalize} Leads — ${day.name}`, leads: filtered });
+    setDrilldown({ isOpen: true, title: `${barKey === 'total' ? 'All' : capitalize} Leads — ${day.name}`, leads: filtered });
   };
 
   const handlePieClick = (_: any, index: number) => {
@@ -520,6 +529,9 @@ const LeadsExplorerPage: React.FC = () => {
   const clearSelection = () => { setSelectedIds([]); setSelectedLeadsCache({}); };
 
   const pieSubtitle = useMemo(() => {
+    if (leadType === 'non-eligible') return 'Non-eligible leads';
+    if (leadType === 'not-interested') return 'Not interested leads';
+    if (leadType === 'eligible') return 'Eligible lead breakdown';
     if (bucket === 'Lost') return 'Sentiment of lost leads';
     if (bucket === 'Pending') return 'Sentiment of pending leads';
     if (bucket === 'DemoBooked') return 'Sentiment of demo-booked leads';
@@ -527,7 +539,7 @@ const LeadsExplorerPage: React.FC = () => {
     if (bucket === 'Failed') return 'Failed / Missed call volume';
     if (['Hot', 'Warm', 'Cold', 'Converted'].includes(bucket)) return `${bucket} leads only`;
     return 'Lead distribution';
-  }, [bucket]);
+  }, [bucket, leadType]);
 
   return (
     <PageShell>
@@ -637,7 +649,7 @@ const LeadsExplorerPage: React.FC = () => {
               <div className="lg:col-span-8">
                 <SectionCard
                   title="Acquisition Trend"
-                  subtitle={bucket !== 'all' ? `Showing ${bucket} leads` : 'Daily capture rate'}
+                  subtitle={leadType !== 'all' ? `Showing ${leadType} leads` : bucket !== 'all' ? `Showing ${bucket} leads` : 'Daily capture rate'}
                   icon={<TrendingUp size={16} />}
                   className="h-[420px]"
                   headerActions={<TimeframeDropdown value={trendTimeframe} onChange={setTrendTimeframe} />}
@@ -673,6 +685,10 @@ const LeadsExplorerPage: React.FC = () => {
                               <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
                               <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
                             </linearGradient>
+                            <linearGradient id="lBarTotal" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1}/>
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.6}/>
+                            </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
@@ -701,6 +717,10 @@ const LeadsExplorerPage: React.FC = () => {
                           {visibleBars.includes('failed') && (
                             <Bar dataKey="failed" name="Failed / Missed" fill="url(#lBarFailed)" radius={[4, 4, 0, 0]} barSize={20} stackId="a"
                               className="cursor-pointer" onClick={(data: any) => handleBarClick({ payload: data }, 'failed')} />
+                          )}
+                          {visibleBars.includes('total') && (
+                            <Bar dataKey="total" name="Total Leads" fill="url(#lBarTotal)" radius={[4, 4, 0, 0]} barSize={20} stackId="a"
+                              className="cursor-pointer" onClick={(data: any) => handleBarClick({ payload: data }, 'total')} />
                           )}
                         </BarChart>
                       </ResponsiveContainer>

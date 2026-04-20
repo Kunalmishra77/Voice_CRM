@@ -53,6 +53,7 @@ export interface TrendPoint {
   converted: number;
   lost: number;
   failed: number;
+  total: number;
   from: string;
   to: string;
 }
