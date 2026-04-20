@@ -183,7 +183,7 @@ export const conversationService = {
   getConversations: async (filters: any) => {
     const { q } = filters;
     const page = safeInt(filters.page, 1);
-    const limit = safeInt(filters.limit, 500);
+    const limit = safeInt(filters.limit, 10000);
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
     const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
     console.log('[conversations] filters:', { q, date_from, date_to, page, limit });
@@ -279,7 +279,7 @@ export const leadService = {
   getLeads: async (filters: any) => {
     const { stage, sentiment, q, lead_type } = filters;
     const page = safeInt(filters.page, 1);
-    const limit = safeInt(filters.limit, 500);
+    const limit = safeInt(filters.limit, 10000);
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
     const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
     console.log('[leads] filters:', { stage, sentiment, q, date_from, date_to, page, limit });

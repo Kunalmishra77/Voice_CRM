@@ -103,6 +103,7 @@ export class BackendProvider implements IDataProvider {
         date_from: params.range?.from,
         date_to: params.range?.to,
         lead_type: !params.leadType || params.leadType === 'all' ? undefined : params.leadType,
+        limit: params.limit ?? 10000,
     });
     return res.data.map((l: any) => ({
         ...l,
