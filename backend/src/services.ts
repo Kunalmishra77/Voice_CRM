@@ -531,6 +531,16 @@ export const dashboardService = {
     const lostCount = lostIds.size;
     // Pending = all leads in range that are not converted or lost
     const pendingCount = total - convertedInRange - lostInRange;
+
+    // Lead type counts (DB column only — no keyword inference)
+    let eligibleCount = 0, nonEligibleCount = 0, notInterestedCount = 0;
+    filteredData.forEach((row: any) => {
+      const lt = normalizeLeadType(String(row['Type of Lead'] || ''));
+      if (lt === 'Eligible') eligibleCount++;
+      else if (lt === 'Non-Eligible') nonEligibleCount++;
+      else if (lt === 'Not Interested') notInterestedCount++;
+    });
+
     const bucket_counts = {
       all: total,
       Hot: stage_counts.Hot,
@@ -542,6 +552,9 @@ export const dashboardService = {
       Callback: stage_counts.Callback,
       Failed: stage_counts.Failed,
       Pending: pendingCount,
+      Eligible: eligibleCount,
+      NonEligible: nonEligibleCount,
+      NotInterested: notInterestedCount,
     };
     console.log('[metrics] db_total:', db_total, 'filtered_total:', total, 'bucket_counts:', JSON.stringify(bucket_counts));
     return {

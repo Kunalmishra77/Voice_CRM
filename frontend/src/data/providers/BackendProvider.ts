@@ -87,6 +87,9 @@ export class BackendProvider implements IDataProvider {
       demoBooked: stats.bucket_counts?.['DemoBooked'] || 0,
       callbacks: stats.bucket_counts?.['Callback'] || 0,
       failedCalls: stats.bucket_counts?.['Failed'] || 0,
+      eligibleLeads: stats.bucket_counts?.['Eligible'] || 0,
+      nonEligibleLeads: stats.bucket_counts?.['NonEligible'] || 0,
+      notInterestedLeads: stats.bucket_counts?.['NotInterested'] || 0,
       bucketCounts: stats.bucket_counts
     };
   }

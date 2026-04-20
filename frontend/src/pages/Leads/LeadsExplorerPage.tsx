@@ -390,12 +390,15 @@ const LeadsExplorerPage: React.FC = () => {
     });
     const capitalize = barKey.charAt(0).toUpperCase() + barKey.slice(1);
     let filtered: LeadInsightRow[] = [];
+    const FAILED_STATUSES = ['failed', 'error', 'no answer', 'no_answer'];
     if (['hot', 'warm', 'cold'].includes(barKey)) {
       filtered = dayLeads.filter(l => l.sentiment === capitalize);
     } else if (barKey === 'converted') {
       filtered = dayLeads.filter(l => (l.status as any) === 'crm_converted');
     } else if (barKey === 'lost') {
       filtered = dayLeads.filter(l => LOST_STATUSES.includes((l.status as any)));
+    } else if (barKey === 'failed') {
+      filtered = dayLeads.filter(l => FAILED_STATUSES.includes((l['lead stage'] || l.status || '').toLowerCase()));
     }
     setDrilldown({ isOpen: true, title: `${capitalize} Leads — ${day.name}`, leads: filtered });
   };
@@ -473,7 +476,7 @@ const LeadsExplorerPage: React.FC = () => {
     setIsExportOpen(false);
   };
 
-  const handleExportAction = async (type: 'all' | 'hot' | 'warm' | 'cold' | 'selection' | 'current' | 'transcripts_selection' | 'transcripts_all') => {
+  const handleExportAction = async (type: 'all' | 'hot' | 'warm' | 'cold' | 'selection' | 'current' | 'transcripts_selection' | 'transcripts_all' | 'eligible' | 'non-eligible' | 'not-interested') => {
     const today = format(new Date(), 'yyyy-MM-dd');
     if (type === 'selection') {
       const selected = selectedIds.map(id => selectedLeadsCache[id]).filter(Boolean);
@@ -484,8 +487,11 @@ const LeadsExplorerPage: React.FC = () => {
     } else if (type === 'transcripts_all') {
       downloadTranscripts(leads || [], `transcripts_${bucket}_${today}`);
     } else if (type === 'all') {
-      const all = await dataProvider.getLeads({ range: { from: '1970-01-01', to: '2100-12-31' }, bucket: 'all' });
+      const all = await dataProvider.getLeads({ range: { from: '1970-01-01', to: '2100-12-31' }, bucket: 'all', limit: 10000 });
       downloadCSV(all, `all_leads_${today}`);
+    } else if (type === 'eligible' || type === 'non-eligible' || type === 'not-interested') {
+      const segment = await dataProvider.getLeads({ range: { from: '1970-01-01', to: '2100-12-31' }, bucket: 'all', leadType: type, limit: 10000 });
+      downloadCSV(segment, `${type}_leads_${today}`);
     } else if (['hot', 'warm', 'cold'].includes(type)) {
       const segment = await dataProvider.getLeads({ range, bucket: type.charAt(0).toUpperCase() + type.slice(1) });
       downloadCSV(segment, `${type}_leads_${today}`);
@@ -566,10 +572,13 @@ const LeadsExplorerPage: React.FC = () => {
                     </>
                   )}
                   <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Export CSV</p>
-                  <button onClick={() => handleExportAction('all')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-foreground/70 transition-colors cursor-pointer">Full Database</button>
+                  <button onClick={() => handleExportAction('all')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-foreground/70 transition-colors cursor-pointer">All Leads</button>
                   <button onClick={() => handleExportAction('hot')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-rose-500 transition-colors cursor-pointer">Hot Leads</button>
                   <button onClick={() => handleExportAction('warm')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-amber-500 transition-colors cursor-pointer">Warm Leads</button>
                   <button onClick={() => handleExportAction('cold')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-blue-500 transition-colors cursor-pointer">Cold Leads</button>
+                  <button onClick={() => handleExportAction('eligible')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-teal-500 transition-colors cursor-pointer">Eligible Leads</button>
+                  <button onClick={() => handleExportAction('non-eligible')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-orange-500 transition-colors cursor-pointer">Non-Eligible Leads</button>
+                  <button onClick={() => handleExportAction('not-interested')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-slate-400 transition-colors cursor-pointer">Not Interested Leads</button>
                   <div className="h-px bg-border mx-2 my-1" />
                   <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Transcripts</p>
                   <button onClick={() => handleExportAction('transcripts_all')} className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-accent text-purple-500 transition-colors cursor-pointer">Current View Transcripts</button>

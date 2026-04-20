@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Users, Flame, Zap, CheckCircle2, XCircle, TrendingUp,
-  Activity, FileSearch, Clock, Target, Radio, PieChart as PieIcon, BarChart4, Loader2, ArrowRight, Calendar, ChevronDown, PhoneMissed
+  Activity, FileSearch, Clock, Target, Radio, PieChart as PieIcon, BarChart4, Loader2, ArrowRight, Calendar, ChevronDown, PhoneMissed, UserCheck, UserX, ThumbsDown
 } from 'lucide-react';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -158,7 +158,11 @@ const ChartEmptyState = () => (
 );
 
 /* ─── KPI Cards ─── */
-const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undefined, handleStatClick: (b?: string) => void }) => (
+const KPICards = React.memo(({ kpis, handleStatClick, handleLeadTypeClick }: {
+  kpis: KPIStats | undefined,
+  handleStatClick: (b?: string) => void,
+  handleLeadTypeClick: (type: 'eligible' | 'non-eligible' | 'not-interested') => void
+}) => (
   <div className="space-y-4">
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
       <StatCard label="Total Leads" value={kpis?.totalLeads ?? 0} icon={Users} variant="teal" onClick={() => handleStatClick('all')} />
@@ -169,6 +173,11 @@ const KPICards = React.memo(({ kpis, handleStatClick }: { kpis: KPIStats | undef
       <StatCard label="Lost" value={kpis?.unconverted ?? 0} icon={XCircle} variant="danger" onClick={() => handleStatClick('Lost')} />
       <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
       <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" onClick={() => handleStatClick('Hot')} />
+    </div>
+    <div className="grid grid-cols-3 gap-4">
+      <StatCard label="Eligible" value={kpis?.eligibleLeads ?? 0} icon={UserCheck} variant="teal" onClick={() => handleLeadTypeClick('eligible')} />
+      <StatCard label="Non-Eligible" value={kpis?.nonEligibleLeads ?? 0} icon={UserX} variant="danger" onClick={() => handleLeadTypeClick('non-eligible')} />
+      <StatCard label="Not Interested" value={kpis?.notInterestedLeads ?? 0} icon={ThumbsDown} variant="orange" onClick={() => handleLeadTypeClick('not-interested')} />
     </div>
     {((kpis?.demoBooked ?? 0) > 0 || (kpis?.callbacks ?? 0) > 0 || (kpis?.failedCalls ?? 0) > 0) && (
       <div className="grid grid-cols-3 gap-4">
@@ -236,7 +245,7 @@ const RecentActivityTable = React.memo(({ recentLeads, navigate }: { recentLeads
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
-  const { dateRange, datePreset, lastUpdated, leadType } = useGlobalFilters();
+  const { dateRange, datePreset, lastUpdated, leadType, setLeadType } = useGlobalFilters();
 
   // Per-graph timeframe filters
   const [trendTimeframe, setTrendTimeframe] = useState('global');
@@ -319,6 +328,11 @@ const DashboardPage: React.FC = () => {
     navigate(`/leads?${params.toString()}`);
   };
 
+  const handleLeadTypeClick = (type: 'eligible' | 'non-eligible' | 'not-interested') => {
+    setLeadType(type);
+    navigate('/leads');
+  };
+
   const getLeadsByCategory = (category: string): LeadInsightRow[] => {
     if (!allLeads) return [];
     const LOST_STATUSES = ['crm_lost', 'not interested', 'wrong number', 'busy', 'voicemail'];
@@ -392,7 +406,7 @@ const DashboardPage: React.FC = () => {
         <div className="py-20 flex-1"><EmptyState icon={FileSearch} title="No data found" description="Adjust your filters to see metrics." onAction={() => {}} /></div>
       ) : (
         <div className="space-y-6">
-          <KPICards kpis={kpis} handleStatClick={handleStatClick} />
+          <KPICards kpis={kpis} handleStatClick={handleStatClick} handleLeadTypeClick={handleLeadTypeClick} />
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
             <div className="xl:col-span-2 flex flex-col gap-6">

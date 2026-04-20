@@ -13,6 +13,9 @@ export interface KPIStats {
   demoBooked: number;
   callbacks: number;
   failedCalls: number;
+  eligibleLeads: number;
+  nonEligibleLeads: number;
+  notInterestedLeads: number;
   bucketCounts?: Record<string, number>;
 }
 
