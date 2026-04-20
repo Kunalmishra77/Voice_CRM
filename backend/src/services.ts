@@ -31,64 +31,15 @@ const CRM_CONVERTED = 'crm_converted';
 const CRM_LOST = 'crm_lost';
 const LOST_STATUSES = ['not interested', 'wrong number', 'busy', 'voicemail'];
 
-// ── "Not Interested" detection ────────────────────────────────────────────────
-// Covers: explicit Type-of-Lead value from voice bot (Option A)
-//       + keyword scan of the Conversation Summary (Option B / fallback)
-// Add new phrases here freely — matching is case-insensitive substring search.
-const NOT_INTERESTED_KEYWORDS: string[] = [
-  // ── English ──────────────────────────────────────────────────────────────
-  'not interested', 'no interest', 'not at all interested',
-  'declined to speak', 'declined the offer', 'declined the call',
-  'not interested in learning', 'not interested in discussing',
-  'not suitable', 'not relevant', 'not for me', 'not for us',
-  'not a fit', 'not a good fit', 'not useful',
-  'disinterest', 'disinterested', 'expressed disinterest',
-  'does not want', "don't want", 'do not want', "doesn't want",
-  'not want', 'does not wish', "doesn't wish",
-  'no need', 'not need', "don't need", "doesn't need", 'not needed',
-  'not required', 'not looking for', 'not in need', 'won\'t be needing',
-  'refused', 'refusal', 'not willing', 'unwilling',
-  'hung up', 'hang up', 'cut the call', 'disconnected abruptly',
-  'not considering', 'already have', 'already using',
-  'told the agent to stop', 'asked the agent to stop',
-  'not at this time', 'not now', 'please remove', 'do not call',
-  // ── Hindi / Hinglish ─────────────────────────────────────────────────────
-  'nahi chahiye', 'nhi chahiye', 'nahin chahiye', 'nahi chahie',
-  'nahi lena', 'nhi lena', 'nahin lena', 'nahi lena hai',
-  'interest nahi', 'interested nahi', 'nahi interested', 'koi interest nahi',
-  'zaroorat nahi', 'zaroorat nahin', 'koi zaroorat nahi', 'iski zaroorat nahi',
-  'chahiye nahi', 'chahie nahi',
-  'bilkul nahi', 'bilkul nahin', 'bilkul nhi',
-  'nahi chahta', 'nahi chahti', 'nahi chahte',
-  'mujhe nahi chahiye', 'hume nahi chahiye', 'hamein nahi chahiye',
-  'yeh nahi chahiye', 'iski koi zaroorat nahi',
-  'karna nahi', 'nahi karna', 'lena nahi',
-  'band karo', 'mat karo', 'call mat karo', 'dobara call mat',
-  'ek baar nahi', 'ek bar nahi', 'nahi nahi',
-  'nahi chahiye mujhe', 'nahi chahiye hume',
-  // ── Urdu / Roman Urdu ────────────────────────────────────────────────────
-  'nahi chahta', 'mujhe nahi', 'hamein nahi', 'koi zaroorat',
-  'muze nahi chahiye', 'muje nahi chahiye',
-];
-
-const NOT_INTERESTED_TYPE_VALUES = [
-  'not interested', 'not_interested', 'notinterested', 'not-interested',
-  'not interested at all', 'disinterested',
-];
-
-/** Returns true if the summary text strongly suggests the lead explicitly refused */
-function isNotInterestedBySummary(summary: string): boolean {
-  if (!summary) return false;
-  const lower = summary.toLowerCase();
-  return NOT_INTERESTED_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-/** Returns true if this lead should be classified as "Not Interested"
- *  Checks both: (A) explicit Type-of-Lead column value, (B) summary keywords */
-function isNotInterestedLead(leadTypeRaw: string, summary: string): boolean {
-  const lt = (leadTypeRaw || '').toLowerCase().trim();
-  if (NOT_INTERESTED_TYPE_VALUES.includes(lt)) return true;
-  return isNotInterestedBySummary(summary);
+/** Normalize the raw "Type of Lead" DB column to one of three canonical values.
+ *  Only the DB column is used — no keyword scanning of summaries. */
+function normalizeLeadType(raw: string): 'Eligible' | 'Non-Eligible' | 'Not Interested' | null {
+  const lt = (raw || '').toLowerCase().trim();
+  if (!lt) return null;
+  if (lt === 'eligible' || lt === 'eligilble' || lt === 'eligble') return 'Eligible';
+  if (lt === 'non eligible' || lt === 'non-eligible' || lt === 'non_eligible' || lt === 'ineligible') return 'Non-Eligible';
+  if (lt === 'not interested' || lt === 'not_interested' || lt === 'not-interested' || lt === 'notinterested') return 'Not Interested';
+  return null;
 }
 
 /** Validate a YYYY-MM-DD date string */
@@ -366,12 +317,8 @@ export const leadService = {
           : r[COLS.leads.status];
         const rawCallStatus = String(r[COLS.leads.status] || '').toLowerCase().trim();
         const isFailedCall = ['failed', 'error', 'no answer', 'no_answer'].includes(rawCallStatus);
-        // Effective lead type: explicit DB value OR keyword detection on summary
         const rawLeadType = String(r[COLS.leads.lead_type] || '');
-        const summary = String(r[COLS.leads.summary] || '');
-        const effectiveLeadType = isNotInterestedLead(rawLeadType, summary)
-          ? 'Not Interested'
-          : rawLeadType || null;
+        const effectiveLeadType = normalizeLeadType(rawLeadType);
         return {
           ...r,
           leadid: leadId,
@@ -441,13 +388,13 @@ export const leadService = {
       filtered = filtered.filter(l => l.sentiment === sentiment);
     }
 
-    // 4. Filter by Lead Type (Eligible / Non-Eligible / Not Interested)
+    // 4. Filter by Lead Type — match against the already-normalized effectiveLeadType
     if (lead_type && lead_type !== 'all') {
       filtered = filtered.filter(l => {
-        const lt = String(l.lead_type || '').toLowerCase().trim();
-        if (lead_type === 'eligible') return lt === 'eligilble' || lt === 'eligible' || lt === 'eligble';
-        if (lead_type === 'non-eligible') return (lt === 'non eligible' || lt === 'non-eligible' || lt === 'ineligible' || lt === 'non_eligible');
-        if (lead_type === 'not-interested') return lt === 'not interested';
+        const lt = String(l.lead_type || '');
+        if (lead_type === 'eligible') return lt === 'Eligible';
+        if (lead_type === 'non-eligible') return lt === 'Non-Eligible';
+        if (lead_type === 'not-interested') return lt === 'Not Interested';
         return true;
       });
     }
@@ -551,12 +498,10 @@ export const dashboardService = {
         if (date_to && callDate > date_to) return false;
       }
       if (lead_type && lead_type !== 'all') {
-        const lt = String(r['Type of Lead'] || '').toLowerCase().trim();
-        const summaryRaw = String(r[COLS.leads.summary] || '');
-        const notInterested = isNotInterestedLead(lt, summaryRaw);
-        if (lead_type === 'not-interested' && !notInterested) return false;
-        if (lead_type === 'eligible' && (notInterested || (lt !== 'eligilble' && lt !== 'eligible' && lt !== 'eligble'))) return false;
-        if (lead_type === 'non-eligible' && (notInterested || (lt !== 'non eligible' && lt !== 'non-eligible' && lt !== 'ineligible' && lt !== 'non_eligible'))) return false;
+        const normalized = normalizeLeadType(String(r['Type of Lead'] || ''));
+        if (lead_type === 'eligible' && normalized !== 'Eligible') return false;
+        if (lead_type === 'non-eligible' && normalized !== 'Non-Eligible') return false;
+        if (lead_type === 'not-interested' && normalized !== 'Not Interested') return false;
       }
       return true;
     });
