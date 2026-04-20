@@ -174,18 +174,14 @@ const KPICards = React.memo(({ kpis, handleStatClick, handleLeadTypeClick }: {
       <StatCard label="Pending" value={kpis?.pendingDecisions ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Pending')} />
       <StatCard label="Avg Score" value={kpis?.avgScore ?? 0} icon={Target} variant="blue" onClick={() => handleStatClick('Hot')} />
     </div>
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       <StatCard label="Eligible" value={kpis?.eligibleLeads ?? 0} icon={UserCheck} variant="teal" onClick={() => handleLeadTypeClick('eligible')} />
       <StatCard label="Non-Eligible" value={kpis?.nonEligibleLeads ?? 0} icon={UserX} variant="danger" onClick={() => handleLeadTypeClick('non-eligible')} />
       <StatCard label="Not Interested" value={kpis?.notInterestedLeads ?? 0} icon={ThumbsDown} variant="orange" onClick={() => handleLeadTypeClick('not-interested')} />
+      <StatCard label="Failed / Missed" value={kpis?.failedCalls ?? 0} icon={PhoneMissed} variant="danger" onClick={() => handleStatClick('Failed')} />
+      <StatCard label="Demo Booked" value={kpis?.demoBooked ?? 0} icon={Radio} variant="purple" onClick={() => handleStatClick('DemoBooked')} />
+      <StatCard label="Callbacks" value={kpis?.callbacks ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Callback')} />
     </div>
-    {((kpis?.demoBooked ?? 0) > 0 || (kpis?.callbacks ?? 0) > 0 || (kpis?.failedCalls ?? 0) > 0) && (
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Failed / Missed" value={kpis?.failedCalls ?? 0} icon={PhoneMissed} variant="danger" onClick={() => handleStatClick('Failed')} />
-        <StatCard label="Demo Booked" value={kpis?.demoBooked ?? 0} icon={Radio} variant="purple" onClick={() => handleStatClick('DemoBooked')} />
-        <StatCard label="Callbacks" value={kpis?.callbacks ?? 0} icon={Clock} variant="orange" onClick={() => handleStatClick('Callback')} />
-      </div>
-    )}
   </div>
 ));
 
