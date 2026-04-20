@@ -529,8 +529,9 @@ export const dashboardService = {
     // Converted/Lost come directly from outcomes table — permanent, date-agnostic
     const convertedCount = convertedIds.size;
     const lostCount = lostIds.size;
-    // Pending = all leads in range that are not converted or lost
-    const pendingCount = total - convertedInRange - lostInRange;
+    // Pending = leads in range that are not converted, lost, failed, or callback
+    // (failed = no further work; callback = already being handled)
+    const pendingCount = total - convertedInRange - lostInRange - stage_counts.Failed - stage_counts.Callback - stage_counts.DemoBooked;
 
     // Lead type counts (DB column only — no keyword inference)
     let eligibleCount = 0, nonEligibleCount = 0, notInterestedCount = 0;
