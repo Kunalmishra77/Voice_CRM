@@ -397,13 +397,21 @@ export const leadService = {
         return parseInt(String(b[COLS.leads.id] || 0)) - parseInt(String(a[COLS.leads.id] || 0));
       });
 
+    // 0. Always exclude leads that are currently queued/calling — they belong in Live Calling only.
+    //    Once their status changes (completed, failed, demo_booked, etc.) they appear here.
+    const LIVE_ONLY_STATUSES = ['to call', 'to_call', 'calling', 'ringing', 'in progress', 'in_progress', 'queued', 'scheduled'];
+    const allRows_filtered = allRows.filter(row => {
+      const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+      return !LIVE_ONLY_STATUSES.includes(rawSt);
+    });
+
     // 1. Filter by Date
     // Converted/Lost/Failed: date-agnostic — always show all regardless of range
     // Null-timestamp records get callDate='1970-01-01'; they are excluded from any range
     //   where date_from > '1970-01-01' (daily/weekly/monthly) but included in allTime
     //   (because allTime sends date_from='1970-01-01', so '1970-01-01' < '1970-01-01' is false)
     const isDateAgnosticBucket = stage === 'Converted' || stage === 'Lost' || stage === 'Failed';
-    let filtered = isDateAgnosticBucket ? allRows : allRows.filter(row => {
+    let filtered = isDateAgnosticBucket ? allRows_filtered : allRows_filtered.filter(row => {
       if (date_from && row.callDate < date_from) return false;
       if (date_to && row.callDate > date_to) return false;
       return true;
@@ -530,8 +538,12 @@ export const dashboardService = {
     let convertedInRange = 0;
     let lostInRange = 0;
 
+    const LIVE_ONLY_STATUSES_STATS = ['to call', 'to_call', 'calling', 'ringing', 'in progress', 'in_progress', 'queued', 'scheduled'];
     const filteredData = (data || []).filter(row => {
       const r = row as any;
+      // Exclude leads currently in the call queue / on a live call — they show in Live Calling only
+      const rawSt = String(r[COLS.leads.status] || '').toLowerCase().trim();
+      if (LIVE_ONLY_STATUSES_STATS.includes(rawSt)) return false;
       if (date_from || date_to) {
         const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
         const callDate = callTs ? callTs.substring(0, 10) : '1970-01-01';
