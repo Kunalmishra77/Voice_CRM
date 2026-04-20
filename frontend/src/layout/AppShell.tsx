@@ -6,20 +6,22 @@ import { Footer } from './Footer';
 import { cn } from '../lib/utils';
 import { useNotificationEngine } from '../hooks/useNotificationEngine';
 import { useNotificationStore } from '../state/notificationStore';
-import { useGlobalFilters } from '../state/globalFiltersStore';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const AppShell: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   useNotificationEngine();
 
   const crmRefreshInterval = useNotificationStore(s => s.prefs.crmRefreshInterval);
-  const triggerRefresh = useGlobalFilters(s => s.triggerRefresh);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!crmRefreshInterval || crmRefreshInterval <= 0) return;
-    const id = setInterval(() => triggerRefresh(), crmRefreshInterval * 1000);
+    // invalidateQueries triggers silent background refetch — existing data stays
+    // visible on screen until new data arrives (no flash / no progress bar reset)
+    const id = setInterval(() => queryClient.invalidateQueries(), crmRefreshInterval * 1000);
     return () => clearInterval(id);
-  }, [crmRefreshInterval, triggerRefresh]);
+  }, [crmRefreshInterval, queryClient]);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">

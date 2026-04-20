@@ -180,10 +180,8 @@ const LiveCallsPage: React.FC = () => {
           {!isLoading && summary.total_today > 0 && (
             <div className="mt-4 flex items-center gap-3">
               <div className="flex-1 h-2 rounded-full bg-accent overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${completionRate}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                <div
+                  style={{ width: `${completionRate}%`, transition: 'width 0.8s ease-out' }}
                   className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500"
                 />
               </div>

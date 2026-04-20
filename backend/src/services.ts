@@ -183,7 +183,7 @@ export const conversationService = {
   getConversations: async (filters: any) => {
     const { q } = filters;
     const page = safeInt(filters.page, 1);
-    const limit = safeInt(filters.limit, 10000);
+    const limit = safeInt(filters.limit, 10000000);
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
     const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
     console.log('[conversations] filters:', { q, date_from, date_to, page, limit });
@@ -193,7 +193,7 @@ export const conversationService = {
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
     // No created_at column — fetch all, filter by parsed call_date_time in memory
-    const { data, error } = await query.limit(10000);
+    const { data, error } = await query.limit(10000000);
     if (error) throw error;
 
     const allRows = (data || [])
@@ -279,7 +279,7 @@ export const leadService = {
   getLeads: async (filters: any) => {
     const { stage, sentiment, q, lead_type } = filters;
     const page = safeInt(filters.page, 1);
-    const limit = safeInt(filters.limit, 10000);
+    const limit = safeInt(filters.limit, 10000000);
     const date_from = isValidDate(filters.date_from) ? filters.date_from.trim() : null;
     const date_to = isValidDate(filters.date_to) ? filters.date_to.trim() : null;
     console.log('[leads] filters:', { stage, sentiment, q, date_from, date_to, page, limit });
@@ -301,8 +301,8 @@ export const leadService = {
     console.log('[leads] outcomes loaded — converted:', convertedLeadIds.size, 'lost:', lostLeadIds.size);
 
     // No created_at column — fetch all rows, filter by parsed call_date_time in memory
-    // .limit(10000) overrides PostgREST's default 1000-row cap
-    const { data, error } = await query.limit(10000);
+    // .limit(10000000) overrides PostgREST's default 1000-row cap
+    const { data, error } = await query.limit(10000000);
     if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
 
     const allRows = (data || [])
@@ -471,11 +471,11 @@ export const dashboardService = {
     console.log('[metrics] outcomes loaded — converted:', convertedIds.size, 'lost:', lostIds.size);
 
     // Fetch all leads, filter by call date + lead_type in memory
-    // .limit(10000) overrides PostgREST's default 1000-row cap
+    // .limit(10000000) overrides PostgREST's default 1000-row cap
     const { data, error } = await supabase
       .from(LEADS_TABLE)
       .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead", ${COLS.leads.summary}`)
-      .limit(10000);
+      .limit(10000000);
     if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
     const db_total = (data || []).length; // raw DB row count — always 100% of leads, ignores date filter
 
@@ -595,18 +595,23 @@ export const liveCallService = {
     const { data, error } = await supabase
       .from(LEADS_TABLE)
       .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
-      .limit(10000);
+      .limit(10000000);
 
     if (error) { console.error('[live] error:', error.message); throw error; }
 
     const allRows = (data || []).map((r: any) => {
-      const callTs = parseCallDateTime(r[COLS.leads.timestamp]) || '1970-01-01T00:00:00.000Z';
+      const callStatus = normalizeCallStatus(r[COLS.leads.status]);
+      const parsedTs = parseCallDateTime(r[COLS.leads.timestamp]);
+      // For queued/calling leads with no timestamp, use current IST time so the
+      // browser displays the correct Indian time instead of epoch (1970)
+      const istNow = new Date(Date.now() + IST_OFFSET_MS).toISOString().replace('Z', '+05:30');
+      const callTs = parsedTs || ((callStatus === 'queued' || callStatus === 'calling') ? istNow : '1970-01-01T00:00:00.000Z');
       return {
         id: String(r[COLS.leads.id]),
         name: r[COLS.leads.name] || 'Unknown',
         phone: r[COLS.leads.phone],
         raw_status: r[COLS.leads.status],
-        call_status: normalizeCallStatus(r[COLS.leads.status]),
+        call_status: callStatus,
         sentiment: normalizeSentiment(r[COLS.leads.sentiment]),
         duration: parseDuration(r[COLS.leads.duration]),
         created_at: callTs,
@@ -652,7 +657,7 @@ export const debugService = {
     const { data, error } = await supabase
       .from(LEADS_TABLE)
       .select(`${COLS.leads.id}, ${COLS.leads.timestamp}, ${COLS.leads.status}`)
-      .limit(10000);
+      .limit(10000000);
     if (error) throw error;
 
     const dateDist: Record<string, number> = {};
