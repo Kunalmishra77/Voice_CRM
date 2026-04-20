@@ -411,7 +411,9 @@ const LeadDetailPage: React.FC = () => {
                        <div className="p-5 rounded-2xl bg-secondary border border-border">
                           <p className="text-sm font-bold text-foreground">
                             {lead['Action to be taken'] || (
-                              !lead.sentiment
+                              (lead as any).lead_type === 'Not Interested'
+                                ? 'Lead expressed no interest. Do not follow up unless re-engagement is explicitly requested.'
+                                : !lead.sentiment
                                 ? 'Call failed — retry the call or verify the phone number before next attempt.'
                                 : lead.sentiment === 'Hot'
                                 ? 'Schedule a follow-up call within 24 hours — high intent, close the deal now.'
