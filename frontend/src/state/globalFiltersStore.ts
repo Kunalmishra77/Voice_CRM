@@ -19,6 +19,7 @@ interface GlobalFiltersState {
   setSelectedAgent: (agent: string | null) => void;
   setSelectedStage: (stage: string | null) => void;
   setLeadType: (type: 'all' | 'eligible' | 'non-eligible' | 'not-interested') => void;
+  triggerRefresh: () => void;
   resetFilters: () => void;
 }
 
@@ -37,6 +38,7 @@ export const useGlobalFilters = create<GlobalFiltersState>()(
       lastUpdated: Date.now(),
 
       setLeadType: (type: 'all' | 'eligible' | 'non-eligible' | 'not-interested') => set({ leadType: type, lastUpdated: Date.now() }),
+      triggerRefresh: () => set({ lastUpdated: Date.now() }),
 
       setDatePreset: (preset) => {
         if (preset === 'custom') {

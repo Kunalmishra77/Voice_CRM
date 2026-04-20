@@ -17,6 +17,7 @@ export interface NotificationPrefs {
   taskDueAlerts: boolean;
   livePollInterval: number; // seconds
   maxNotifications: number;
+  crmRefreshInterval: number; // seconds; 0 = disabled
 }
 
 interface NotificationState {
@@ -41,6 +42,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   taskDueAlerts: true,
   livePollInterval: 10,
   maxNotifications: 50,
+  crmRefreshInterval: 0,
 };
 
 let _counter = 0;

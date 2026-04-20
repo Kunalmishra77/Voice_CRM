@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Settings, Moon, Sun, Bell, Cpu, Clock,
   PhoneCall, Flame, ClipboardList, Activity,
-  RefreshCw, Shield, Timer, Volume2, Trash2
+  RefreshCw, Shield, Timer, Volume2, Trash2, Database
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -115,6 +115,55 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </SectionCard>
+
+          {/* CRM Auto-Refresh */}
+          <SectionCard title="CRM Auto-Refresh" subtitle="Automatically reload all CRM data at a set interval." icon={<RefreshCw size={18} className="text-primary" />}>
+            <div className="p-6 rounded-2xl bg-secondary/40 border border-border/50 space-y-5">
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center text-teal-500 border border-teal-500/20 shadow-sm">
+                  <Database size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground tracking-tight">Refresh Interval</p>
+                  <p className="text-[11px] font-medium text-muted-foreground">Updates leads, stats, and graphs silently in the background.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                {([
+                  { label: 'Off', value: 0 },
+                  { label: '5s', value: 5 },
+                  { label: '10s', value: 10 },
+                  { label: '30s', value: 30 },
+                  { label: '1 min', value: 60 },
+                  { label: '2 min', value: 120 },
+                  { label: '5 min', value: 300 },
+                  { label: '10 min', value: 600 },
+                ] as { label: string; value: number }[]).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      updatePrefs({ crmRefreshInterval: opt.value });
+                      toast.success(opt.value === 0 ? 'Auto-refresh disabled' : `CRM will refresh every ${opt.label}`);
+                    }}
+                    className={cn(
+                      "py-3 rounded-xl text-[11px] font-bold transition-all border shadow-sm cursor-pointer",
+                      prefs.crmRefreshInterval === opt.value
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card border-border/60 text-muted-foreground hover:border-primary/40 hover:bg-accent"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {prefs.crmRefreshInterval > 0 && (
+                <p className="text-[11px] text-teal-500 font-medium flex items-center gap-1.5">
+                  <RefreshCw size={11} className="animate-spin" style={{ animationDuration: '3s' }} />
+                  Auto-refreshing every {prefs.crmRefreshInterval >= 60 ? `${prefs.crmRefreshInterval / 60} min` : `${prefs.crmRefreshInterval}s`}
+                </p>
+              )}
             </div>
           </SectionCard>
 
@@ -247,6 +296,7 @@ const SettingsPage: React.FC = () => {
                 { label: 'Database', status: 'Connected', color: 'text-emerald-500', dot: 'bg-emerald-500' },
                 { label: 'Google Sheet Sync', status: 'Active', color: 'text-emerald-500', dot: 'bg-emerald-500' },
                 { label: 'Live Poll Interval', status: `${prefs.livePollInterval}s`, color: 'text-blue-500', dot: 'bg-blue-500' },
+                { label: 'CRM Auto-Refresh', status: prefs.crmRefreshInterval > 0 ? (prefs.crmRefreshInterval >= 60 ? `${prefs.crmRefreshInterval / 60}m` : `${prefs.crmRefreshInterval}s`) : 'Off', color: prefs.crmRefreshInterval > 0 ? 'text-teal-500' : 'text-muted-foreground', dot: prefs.crmRefreshInterval > 0 ? 'bg-teal-500' : 'bg-muted-foreground' },
                 { label: 'Notification Alerts', status: [prefs.hotLeadAlerts && 'Hot', prefs.callCompletedAlerts && 'Calls', prefs.taskDueAlerts && 'Tasks'].filter(Boolean).join(', ') || 'All off', color: prefs.hotLeadAlerts || prefs.callCompletedAlerts || prefs.taskDueAlerts ? 'text-emerald-500' : 'text-muted-foreground', dot: prefs.hotLeadAlerts || prefs.callCompletedAlerts || prefs.taskDueAlerts ? 'bg-emerald-500' : 'bg-muted-foreground' },
               ]).map((item, i) => (
                 <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-secondary/30 border border-border/40 hover:border-primary/20 transition-all">
@@ -268,7 +318,8 @@ const SettingsPage: React.FC = () => {
                 { label: 'Hot Lead Alerts', value: prefs.hotLeadAlerts ? 'Enabled' : 'Disabled' },
                 { label: 'Call Alerts', value: prefs.callCompletedAlerts ? 'Enabled' : 'Disabled' },
                 { label: 'Task Alerts', value: prefs.taskDueAlerts ? 'Enabled' : 'Disabled' },
-                { label: 'Refresh Rate', value: `Every ${prefs.livePollInterval}s` },
+                { label: 'Live Poll Interval', value: `Every ${prefs.livePollInterval}s` },
+                { label: 'CRM Auto-Refresh', value: prefs.crmRefreshInterval > 0 ? `Every ${prefs.crmRefreshInterval >= 60 ? `${prefs.crmRefreshInterval / 60} min` : `${prefs.crmRefreshInterval}s`}` : 'Disabled' },
                 { label: 'Max Notifications', value: `${prefs.maxNotifications}` },
               ]).map((item, i) => (
                 <div key={i} className="flex items-center justify-between py-2.5 px-1 border-b border-border/30 last:border-0">

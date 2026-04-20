@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Footer } from './Footer';
 import { cn } from '../lib/utils';
 import { useNotificationEngine } from '../hooks/useNotificationEngine';
+import { useNotificationStore } from '../state/notificationStore';
+import { useGlobalFilters } from '../state/globalFiltersStore';
 
 export const AppShell: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  useNotificationEngine(); // generates real CRM notifications in background
+  useNotificationEngine();
+
+  const crmRefreshInterval = useNotificationStore(s => s.prefs.crmRefreshInterval);
+  const triggerRefresh = useGlobalFilters(s => s.triggerRefresh);
+
+  useEffect(() => {
+    if (!crmRefreshInterval || crmRefreshInterval <= 0) return;
+    const id = setInterval(() => triggerRefresh(), crmRefreshInterval * 1000);
+    return () => clearInterval(id);
+  }, [crmRefreshInterval, triggerRefresh]);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
