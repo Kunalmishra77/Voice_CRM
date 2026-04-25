@@ -161,7 +161,7 @@ const CallInsightsPage: React.FC = () => {
             ) : !summary?.sentimentTrend?.length ? (
               <EmptyState icon={BarChart2} title="No trend data" description="No calls in this date range." />
             ) : (
-              <ChartContainer height="100%" className="min-h-[320px] w-full mt-4 flex-1">
+              <ChartContainer height={320} className="w-full mt-4">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={summary.sentimentTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
