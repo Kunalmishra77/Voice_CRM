@@ -42,7 +42,13 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
   const { theme, toggleTheme } = useTheme();
   const { profile } = useProfile();
-  const { logout } = useAuth();
+  const { logout, user: authUser } = useAuth();
+  const isEmployee = authUser?.role === 'employee';
+
+  // Use real auth data for display; fall back to profile store only for phone/bio/etc.
+  const displayName = authUser?.name || profile.name;
+  const displayEmail = authUser?.email || profile.email;
+  const displayRole = authUser?.role === 'admin' ? 'Admin' : authUser?.role === 'employee' ? 'Employee' : profile.role;
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -100,9 +106,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
     navigate('/login');
   };
 
-  const initials = profile.name
+  const initials = displayName
     .split(' ')
-    .map((w) => w[0])
+    .map((w: string) => w[0])
     .join('')
     .toUpperCase()
     .slice(0, 2) || 'U';
@@ -285,8 +291,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
                 {initials}
               </div>
               <div className="hidden lg:flex flex-col items-start pr-1">
-                <span className="text-sm font-semibold text-foreground leading-none">{profile.name}</span>
-                <span className="text-[10px] text-muted-foreground">{profile.role}</span>
+                <span className="text-sm font-semibold text-foreground leading-none">{displayName}</span>
+                <span className="text-[10px] text-muted-foreground">{displayRole}</span>
               </div>
               <ChevronDown size={14} className="text-muted-foreground hidden lg:block" />
             </div>
@@ -300,16 +306,18 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
               {initials}
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">{profile.name}</p>
-              <p className="text-[10px] text-muted-foreground">{profile.email}</p>
+              <p className="text-sm font-semibold text-foreground">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground">{displayEmail}</p>
             </div>
           </div>
           <DropdownMenuItem onClick={() => navigate('/profile')} icon={<UserIcon size={14} />}>
             My Profile
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate('/settings')} icon={<Settings size={14} />}>
-            Settings
-          </DropdownMenuItem>
+          {!isEmployee && (
+            <DropdownMenuItem onClick={() => navigate('/settings')} icon={<Settings size={14} />}>
+              Settings
+            </DropdownMenuItem>
+          )}
           <div className="h-px bg-border my-1" />
           <DropdownMenuItem onClick={handleLogout} icon={<LogOut size={14} />} className="text-red-500 hover:text-red-600 hover:bg-red-500/10">
             Sign Out

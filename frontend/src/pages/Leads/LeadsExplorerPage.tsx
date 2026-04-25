@@ -902,17 +902,28 @@ const LeadsExplorerPage: React.FC = () => {
                           <td className="px-4 py-4 max-w-[300px]">
                             <p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p>
                             {(rawStatus === 'callback' || rawStatus === 'call_back' || rawStatus === 'demo_booked') && (() => {
-                              const ts = (lead as any).CallTimestamp || (lead as any).created_at;
-                              if (!ts) return null;
-                              try {
-                                const d = new Date(ts);
-                                if (isNaN(d.getTime())) return null;
-                                return (
-                                  <p className="text-[10px] font-semibold mt-1" style={{ color: rawStatus === 'demo_booked' ? '#a78bfa' : '#f97316' }}>
-                                    {rawStatus === 'demo_booked' ? 'Demo booked' : 'Callback requested'} · {format(d, 'MMM dd, yyyy · hh:mm a')}
-                                  </p>
-                                );
-                              } catch { return null; }
+                              const summary = (lead as any)['Conversation Summary'] || '';
+                              const requestedTime = (() => {
+                                if (!summary) return null;
+                                const patterns: RegExp[] = [
+                                  /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
+                                  /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
+                                  /((?:tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm))?)/i,
+                                  /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
+                                  /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
+                                  /\b(next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week))\b/i,
+                                ];
+                                for (const p of patterns) { const m = summary.match(p); if (m) return (m[1] || m[0]).trim(); }
+                                return null;
+                              })();
+                              const color = rawStatus === 'demo_booked' ? '#a78bfa' : '#f97316';
+                              const label = rawStatus === 'demo_booked' ? 'Requested demo' : 'Requested callback';
+                              if (!requestedTime) return null;
+                              return (
+                                <p className="text-[10px] font-semibold mt-1" style={{ color }}>
+                                  {label} · {requestedTime}
+                                </p>
+                              );
                             })()}
                           </td>
                           <td className="px-4 py-4 text-right">

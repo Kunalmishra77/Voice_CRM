@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useProfile } from './profileStore';
 
 export interface User {
   id: string;
@@ -38,15 +39,18 @@ export const useAuth = create<AuthState>()(
           if (!res.ok) return false;
           const data = await res.json();
           if (data.success && data.token) {
-            set({
-              isAuthenticated: true,
-              token: data.token,
-              user: {
-                id: data.user.id,
-                name: data.user.name,
-                email: data.user.email,
-                role: data.user.role,
-              },
+            const authUser = {
+              id: data.user.id,
+              name: data.user.name,
+              email: data.user.email,
+              role: data.user.role,
+            };
+            set({ isAuthenticated: true, token: data.token, user: authUser });
+            // Sync profile store so Profile page shows real user data
+            useProfile.getState().updateProfile({
+              name: authUser.name,
+              email: authUser.email,
+              role: authUser.role === 'admin' ? 'Admin' : 'Employee',
             });
             return true;
           }
@@ -57,6 +61,7 @@ export const useAuth = create<AuthState>()(
       },
       logout: () => {
         set({ isAuthenticated: false, user: null, token: null });
+        useProfile.getState().resetProfile();
       },
     }),
     {
