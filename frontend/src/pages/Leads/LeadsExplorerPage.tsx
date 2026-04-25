@@ -900,8 +900,7 @@ const LeadsExplorerPage: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4 max-w-[300px]">
-                            <p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p>
-                            {(rawStatus === 'callback' || rawStatus === 'call_back' || rawStatus === 'demo_booked') && (() => {
+                            {(rawStatus === 'callback' || rawStatus === 'call_back' || rawStatus === 'demo_booked') ? (() => {
                               const summary = (lead as any)['Conversation Summary'] || '';
                               const requestedTime = (() => {
                                 if (!summary) return null;
@@ -916,15 +915,30 @@ const LeadsExplorerPage: React.FC = () => {
                                 for (const p of patterns) { const m = summary.match(p); if (m) return (m[1] || m[0]).trim(); }
                                 return null;
                               })();
-                              const color = rawStatus === 'demo_booked' ? '#a78bfa' : '#f97316';
-                              const label = rawStatus === 'demo_booked' ? 'Requested demo' : 'Requested callback';
-                              if (!requestedTime) return null;
+                              const isDemo = rawStatus === 'demo_booked';
+                              const accentColor = isDemo ? '#a78bfa' : '#f97316';
+                              const bgColor = isDemo ? 'rgba(167,139,250,0.08)' : 'rgba(249,115,22,0.08)';
+                              const borderColor = isDemo ? 'rgba(167,139,250,0.25)' : 'rgba(249,115,22,0.25)';
+                              const label = isDemo ? 'Requested Demo Time' : 'Requested Callback Time';
                               return (
-                                <p className="text-[10px] font-semibold mt-1" style={{ color }}>
-                                  {label} · {requestedTime}
-                                </p>
+                                <div className="flex flex-col gap-1.5">
+                                  <p className="text-sm text-muted-foreground line-clamp-1">{summary || '...'}</p>
+                                  <div
+                                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5"
+                                    style={{ background: bgColor, border: `1px solid ${borderColor}` }}
+                                  >
+                                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: accentColor }}>
+                                      {label}
+                                    </span>
+                                    <span className="text-[11px] font-bold" style={{ color: accentColor }}>
+                                      {requestedTime ?? '—'}
+                                    </span>
+                                  </div>
+                                </div>
                               );
-                            })()}
+                            })() : (
+                              <p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p>
+                            )}
                           </td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
