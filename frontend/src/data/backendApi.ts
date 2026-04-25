@@ -25,7 +25,7 @@ function buildUrl(path: string, params?: Record<string, any>): string {
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = { 'x-api-key': API_KEY, ...extra };
     try {
-        const stored = localStorage.getItem('voicecrm-auth-session');
+        const stored = localStorage.getItem('voicecrm-auth-v2');
         if (stored) {
             const token = JSON.parse(stored)?.state?.token;
             if (token) headers['Authorization'] = `Bearer ${token}`;

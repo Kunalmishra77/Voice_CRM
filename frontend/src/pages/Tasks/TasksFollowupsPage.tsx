@@ -388,10 +388,10 @@ const TasksFollowupsPage: React.FC = () => {
         due_at: new Date(form.due_at).toISOString(),
         notes: form.notes,
         assigned_to: form.assigned_to,
-        assigned_by: 'Admin',
+        assigned_by: authUser?.name || 'Admin',
         assignment_type: 'specific',
         priority: form.priority,
-        created_by: 'Admin',
+        created_by: authUser?.name || 'Admin',
       });
       if (success) {
         toast.success("Task created and assigned!");
@@ -413,10 +413,10 @@ const TasksFollowupsPage: React.FC = () => {
         due_at: new Date(form.due_at).toISOString(),
         notes: form.notes || `${form.type} — manually selected leads`,
         assigned_to: form.assigned_to,
-        assigned_by: 'Admin',
+        assigned_by: authUser?.name || 'Admin',
         assignment_type: 'multiple',
         priority: form.priority,
-        created_by: 'Admin',
+        created_by: authUser?.name || 'Admin',
       }));
       const result = await (dataProvider as any).createBulkTasks(bulkTasks);
       if (result.success) {
@@ -441,10 +441,10 @@ const TasksFollowupsPage: React.FC = () => {
         due_at: new Date(form.due_at).toISOString(),
         notes: form.notes || `${form.type} — ${ASSIGNMENT_OPTIONS.find(o => o.value === assignmentType)?.label}`,
         assigned_to: form.assigned_to,
-        assigned_by: 'Admin',
+        assigned_by: authUser?.name || 'Admin',
         assignment_type: assignmentType,
         priority: form.priority,
-        created_by: 'Admin',
+        created_by: authUser?.name || 'Admin',
       }));
 
       const result = await (dataProvider as any).createBulkTasks(bulkTasks);
@@ -580,16 +580,18 @@ const TasksFollowupsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground font-medium mt-1">Assign and manage tasks across your team.</p>
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">{isEmployee ? 'My Tasks' : 'Tasks'}</h1>
+          <p className="text-muted-foreground font-medium mt-1">{isEmployee ? 'Tasks assigned to you by your admin.' : 'Assign and manage tasks across your team.'}</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => refetchTasks()} className="rounded-2xl px-4 h-11 text-muted-foreground">
             <RefreshCw size={14} className="mr-2" /> Refresh
           </Button>
-          <Button variant="primary" size="sm" onClick={() => { resetForm(); setIsNewModalOpen(true); }} className="rounded-2xl px-6 h-11 shadow-sm">
-            <Plus size={14} className="mr-2" /> Assign Task
-          </Button>
+          {!isEmployee && (
+            <Button variant="primary" size="sm" onClick={() => { resetForm(); setIsNewModalOpen(true); }} className="rounded-2xl px-6 h-11 shadow-sm">
+              <Plus size={14} className="mr-2" /> Assign Task
+            </Button>
+          )}
         </div>
       </div>
 
@@ -623,19 +625,21 @@ const TasksFollowupsPage: React.FC = () => {
               </div>
             </div>
           </Card>
-          <Card className="p-6 bg-card border border-border shadow-sm group hover:border-primary/30 transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-500/10 text-purple-500 group-hover:scale-110 transition-transform"><Users size={24} /></div>
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground">Team Members</p>
-                <h4 className="text-3xl font-bold text-foreground tabular-nums tracking-tight">{employees.length}</h4>
+          {!isEmployee && (
+            <Card className="p-6 bg-card border border-border shadow-sm group hover:border-primary/30 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-500/10 text-purple-500 group-hover:scale-110 transition-transform"><Users size={24} /></div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Team Members</p>
+                  <h4 className="text-3xl font-bold text-foreground tabular-nums tracking-tight">{employees.length}</h4>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
 
-        {/* Employee Performance Strip */}
-        {employeeStats.length > 0 && (
+        {/* Employee Performance Strip — admin only */}
+        {!isEmployee && employeeStats.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <button
               onClick={() => setEmployeeFilter('all')}
@@ -696,9 +700,9 @@ const TasksFollowupsPage: React.FC = () => {
               <EmptyState
                 icon={ListTodo}
                 title="No tasks found"
-                description={employeeFilter !== 'all' ? `No tasks assigned to ${getEmployeeName(employeeFilter)}.` : "No tasks match the current filter. Assign a new task to get started."}
-                ctaText="Assign Task"
-                onCtaClick={() => { resetForm(); setIsNewModalOpen(true); }}
+                description={isEmployee ? "No tasks have been assigned to you yet." : (employeeFilter !== 'all' ? `No tasks assigned to ${getEmployeeName(employeeFilter)}.` : "No tasks match the current filter. Assign a new task to get started.")}
+                ctaText={isEmployee ? undefined : "Assign Task"}
+                onCtaClick={isEmployee ? undefined : () => { resetForm(); setIsNewModalOpen(true); }}
               />
             ) : (
               <div className="grid grid-cols-1 gap-4">
@@ -755,11 +759,15 @@ const TasksFollowupsPage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 relative z-10 shrink-0 ml-4">
-                      <button onClick={() => openNote(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-foreground transition-all" title="Update Notes"><MessageSquare size={16} /></button>
-                      <button onClick={() => openReschedule(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-foreground transition-all" title="Reschedule"><CalendarClock size={16} /></button>
-                      <button onClick={() => openReassign(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-purple-500 transition-all" title="Reassign"><UserPlus size={16} /></button>
-                      <button onClick={() => handleDeleteTask(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-rose-500 transition-all" title="Delete"><Trash2 size={16} /></button>
-                      <div className="w-px h-8 bg-border mx-2" />
+                      {!isEmployee && (
+                        <>
+                          <button onClick={() => openNote(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-foreground transition-all" title="Update Notes"><MessageSquare size={16} /></button>
+                          <button onClick={() => openReschedule(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-foreground transition-all" title="Reschedule"><CalendarClock size={16} /></button>
+                          <button onClick={() => openReassign(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-purple-500 transition-all" title="Reassign"><UserPlus size={16} /></button>
+                          <button onClick={() => handleDeleteTask(task)} className="p-3 rounded-xl bg-accent text-muted-foreground hover:text-rose-500 transition-all" title="Delete"><Trash2 size={16} /></button>
+                          <div className="w-px h-8 bg-border mx-2" />
+                        </>
+                      )}
                       <Button variant="primary" size="sm" onClick={() => navigate(`/leads?search=${task.phone_number}`)} className="rounded-xl px-4 bg-primary text-primary-foreground font-semibold text-xs shadow-sm">
                         View <ArrowRight size={12} className="ml-2" />
                       </Button>

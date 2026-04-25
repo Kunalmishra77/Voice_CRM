@@ -19,6 +19,7 @@ import { useGlobalFilters } from '../../state/globalFiltersStore';
 import { PageShell } from '../../ui/PageShell';
 import { StatCard } from '../../ui/StatCard';
 import { SectionCard } from '../../ui/SectionCard';
+import { ChartContainer } from '../../ui/ChartContainer';
 import { EmptyState } from '../../ui/EmptyState';
 import { Modal } from '../../ui/Modal';
 import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from 'date-fns';
@@ -417,56 +418,52 @@ const DashboardPage: React.FC = () => {
                 {!trendHasData ? (
                   <ChartEmptyState />
                 ) : (
-                  <div className="w-full h-full pb-2">
-                    {isMounted ? (
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                        <BarChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="barHot" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
-                              <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
-                            </linearGradient>
-                            <linearGradient id="barWarm" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#f59e0b" stopOpacity={1}/>
-                              <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.6}/>
-                            </linearGradient>
-                            <linearGradient id="barCold" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
-                              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.6}/>
-                            </linearGradient>
-                            <linearGradient id="barConverted" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
-                              <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.6}/>
-                            </linearGradient>
-                            <linearGradient id="barLost" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#64748b" stopOpacity={1}/>
-                              <stop offset="100%" stopColor="#64748b" stopOpacity={0.6}/>
-                            </linearGradient>
-                            <filter id="barGlow">
-                              <feGaussianBlur stdDeviation="3" result="blur"/>
-                              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
-                          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }} content={<CustomChartTooltip />} />
-                          <Bar dataKey="hot" name="Hot" fill="url(#barHot)" barSize={18} stackId="a" radius={[0,0,0,0]}
-                            className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'hot')} />
-                          <Bar dataKey="warm" name="Warm" fill="url(#barWarm)" barSize={18} stackId="a"
-                            className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'warm')} />
-                          <Bar dataKey="cold" name="Cold" fill="url(#barCold)" barSize={18} stackId="a"
-                            className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'cold')} />
-                          <Bar dataKey="converted" name="Converted" fill="url(#barConverted)" barSize={18} stackId="a"
-                            className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'converted')} />
-                          <Bar dataKey="lost" name="Lost" fill="url(#barLost)" radius={[4, 4, 0, 0]} barSize={18} stackId="a"
-                            className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'lost')} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center opacity-20"><Loader2 className="w-6 h-6 animate-spin" /></div>
-                    )}
-                  </div>
+                  <ChartContainer height={185}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="barHot" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
+                          </linearGradient>
+                          <linearGradient id="barWarm" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f59e0b" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.6}/>
+                          </linearGradient>
+                          <linearGradient id="barCold" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.6}/>
+                          </linearGradient>
+                          <linearGradient id="barConverted" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.6}/>
+                          </linearGradient>
+                          <linearGradient id="barLost" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#64748b" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#64748b" stopOpacity={0.6}/>
+                          </linearGradient>
+                          <filter id="barGlow">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                          </filter>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
+                        <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }} content={<CustomChartTooltip />} />
+                        <Bar dataKey="hot" name="Hot" fill="url(#barHot)" barSize={18} stackId="a" radius={[0,0,0,0]}
+                          className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'hot')} />
+                        <Bar dataKey="warm" name="Warm" fill="url(#barWarm)" barSize={18} stackId="a"
+                          className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'warm')} />
+                        <Bar dataKey="cold" name="Cold" fill="url(#barCold)" barSize={18} stackId="a"
+                          className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'cold')} />
+                        <Bar dataKey="converted" name="Converted" fill="url(#barConverted)" barSize={18} stackId="a"
+                          className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'converted')} />
+                        <Bar dataKey="lost" name="Lost" fill="url(#barLost)" radius={[4, 4, 0, 0]} barSize={18} stackId="a"
+                          className="cursor-pointer" onClick={(data: any) => handleBarClick(data, 'lost')} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
                 )}
               </SectionCard>
 
@@ -481,33 +478,29 @@ const DashboardPage: React.FC = () => {
                 {!volumeHasData ? (
                   <ChartEmptyState />
                 ) : (
-                  <div className="w-full h-full pb-2">
-                    {isMounted ? (
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                        <AreaChart data={callTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
-                          <defs>
-                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="var(--brand-500)" stopOpacity={0.35}/>
-                              <stop offset="50%" stopColor="var(--brand-500)" stopOpacity={0.12}/>
-                              <stop offset="100%" stopColor="var(--brand-500)" stopOpacity={0}/>
-                            </linearGradient>
-                            <filter id="lineGlow">
-                              <feGaussianBlur stdDeviation="4" result="blur"/>
-                              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
-                          <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomChartTooltip />} />
-                          <Area type="monotone" dataKey="messages" name="Calls" stroke="var(--brand-500)" strokeWidth={2.5} fill="url(#areaGrad)" className="cursor-pointer"
-                            filter="url(#lineGlow)" dot={false} activeDot={{ r: 5, fill: 'var(--brand-500)', stroke: 'var(--brand-400)', strokeWidth: 2, filter: 'url(#lineGlow)' }} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center opacity-20"><Loader2 className="w-6 h-6 animate-spin" /></div>
-                    )}
-                  </div>
+                  <ChartContainer height={185}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={callTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleChartPointClick}>
+                        <defs>
+                          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--brand-500)" stopOpacity={0.35}/>
+                            <stop offset="50%" stopColor="var(--brand-500)" stopOpacity={0.12}/>
+                            <stop offset="100%" stopColor="var(--brand-500)" stopOpacity={0}/>
+                          </linearGradient>
+                          <filter id="lineGlow">
+                            <feGaussianBlur stdDeviation="4" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                          </filter>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
+                        <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomChartTooltip />} />
+                        <Area type="monotone" dataKey="messages" name="Calls" stroke="var(--brand-500)" strokeWidth={2.5} fill="url(#areaGrad)" className="cursor-pointer"
+                          filter="url(#lineGlow)" dot={false} activeDot={{ r: 5, fill: 'var(--brand-500)', stroke: 'var(--brand-400)', strokeWidth: 2, filter: 'url(#lineGlow)' }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
                 )}
               </SectionCard>
             </div>

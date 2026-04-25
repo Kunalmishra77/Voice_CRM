@@ -19,17 +19,7 @@ const adminOnly = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// ─── Auth Endpoints ──────────────────────────────────────────────
-router.post('/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-    const result = await authService.login(email, password);
-    if (!result) return res.status(401).json({ error: 'Invalid email or password' });
-    res.json({ success: true, token: result.token, user: result.user });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
-
+// ─── Auth User Management (admin only, requires x-api-key + JWT) ─
 router.get('/auth/users', adminOnly, async (req, res) => {
   try {
     const users = await authService.listUsers();

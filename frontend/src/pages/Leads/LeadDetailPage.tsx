@@ -101,6 +101,29 @@ const LeadDetailPage: React.FC = () => {
     );
   }
 
+  // Try to extract the callback/demo time the customer requested from the summary text
+  function extractRequestedTime(summary: string): string | null {
+    if (!summary) return null;
+    const patterns: RegExp[] = [
+      // Full date + time: "25th April at 3 PM", "April 25 at 3:30 PM"
+      /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
+      /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
+      // Day + time: "tomorrow at 5 PM", "Monday at 3:30 PM"
+      /((?:tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm))?)/i,
+      // "at 3 PM", "at 3:30 PM"
+      /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
+      // Standalone time: "3 PM", "5:30 PM"
+      /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
+      // "next Monday/week"
+      /\b(next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month))\b/i,
+    ];
+    for (const pattern of patterns) {
+      const match = summary.match(pattern);
+      if (match) return (match[1] || match[0]).trim();
+    }
+    return null;
+  }
+
   const rawStatus = String((lead as any).status || (lead as any)['lead stage'] || '').toLowerCase().trim();
   const isConverted = ['crm_converted', 'converted'].includes(rawStatus);
   const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
@@ -388,6 +411,8 @@ const LeadDetailPage: React.FC = () => {
 
           {/* ── Callback / Demo scheduling info ───────────────────── */}
           {(isCallback || isDemoBooked) && (() => {
+            const summary = lead['Conversation Summary'] || '';
+            const requestedTime = extractRequestedTime(summary);
             const callDate = (() => {
               try {
                 const ts = lead.CallTimestamp || lead.created_at;
@@ -396,57 +421,72 @@ const LeadDetailPage: React.FC = () => {
                 return isNaN(d.getTime()) ? null : d;
               } catch { return null; }
             })();
-            const title = isCallback ? 'Callback Request Details' : 'Demo Booking Details';
-            const subtitle = isCallback
-              ? 'The customer requested a callback during this call.'
-              : 'The customer booked a demo during this call.';
-            const accentColor = isCallback ? 'orange' : 'violet';
             const Icon = isCallback ? AlarmClock : CalendarClock;
             const borderClass = isCallback
               ? 'border-orange-500/20 bg-orange-500/5'
               : 'border-violet-500/20 bg-violet-500/5';
+            const accentText = isCallback ? 'text-orange-500' : 'text-violet-400';
+            const accentBg = isCallback ? 'bg-orange-500/10 border-orange-500/20' : 'bg-violet-500/10 border-violet-500/20';
             const iconColor = isCallback ? '#f97316' : '#a78bfa';
 
             return (
               <SectionCard
-                title={title}
-                subtitle={subtitle}
+                title={isCallback ? 'Callback Request' : 'Demo Booking'}
+                subtitle={isCallback ? 'Customer requested a callback during this call.' : 'Customer booked a demo during this call.'}
                 icon={<Icon size={18} style={{ color: iconColor }} />}
               >
                 <div className={`space-y-4 p-4 rounded-2xl border ${borderClass}`}>
-                  {/* When the request was made */}
+
+                  {/* Requested time — extracted from summary */}
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center shrink-0">
-                      <Clock size={14} className="text-muted-foreground" />
+                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border", accentBg)}>
+                      <CalendarClock size={18} className={accentText} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                        {isCallback ? 'Callback Requested On' : 'Demo Booked On'}
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                        {isCallback ? 'Requested Callback Time' : 'Requested Demo Time'}
                       </p>
-                      <p className="text-sm font-bold text-foreground">
-                        {callDate ? format(callDate, 'EEEE, MMM dd yyyy · hh:mm a') : 'Time not recorded'}
+                      {requestedTime ? (
+                        <p className={cn("text-base font-black tracking-tight", accentText)}>
+                          {requestedTime}
+                        </p>
+                      ) : (
+                        <p className="text-sm font-semibold text-muted-foreground italic">
+                          See customer statement below
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Call made on */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent border border-border flex items-center justify-center shrink-0">
+                      <Clock size={16} className="text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                        Call Made On
+                      </p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {callDate ? format(callDate, 'EEEE, MMM dd yyyy · hh:mm a') : 'Date not recorded'}
                       </p>
                     </div>
                   </div>
 
-                  {/* What the customer said */}
+                  {/* Customer's statement */}
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center shrink-0 mt-0.5">
-                      <MessageSquare size={14} className="text-muted-foreground" />
+                    <div className="w-10 h-10 rounded-xl bg-accent border border-border flex items-center justify-center shrink-0 mt-0.5">
+                      <MessageSquare size={16} className="text-muted-foreground" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                        What the Customer Said
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                        Customer's Statement
                       </p>
                       <p className="text-sm font-medium text-foreground leading-relaxed">
-                        {lead['Conversation Summary'] || 'No call summary available.'}
+                        {summary || 'No call summary available.'}
                       </p>
                     </div>
                   </div>
-
-                  <p className="text-[10px] text-muted-foreground/60 pl-11 italic">
-                    The exact {isCallback ? 'callback time' : 'demo date'} requested by the customer is mentioned in their statement above.
-                  </p>
                 </div>
               </SectionCard>
             );

@@ -17,7 +17,9 @@ interface AuthState {
   logout: () => void;
 }
 
-const BASE = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://localhost:3010/api';
+const _RAW_BASE = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://localhost:3010/api';
+// Strip trailing /api so login hits the public /auth/login route (no x-api-key guard)
+const AUTH_BASE = _RAW_BASE.replace(/\/api\/?$/, '');
 const API_KEY = (import.meta.env.VITE_API_KEY as string) || 'dev_key_2026';
 
 export const useAuth = create<AuthState>()(
@@ -28,7 +30,7 @@ export const useAuth = create<AuthState>()(
       token: null,
       login: async (email, password) => {
         try {
-          const res = await fetch(`${BASE}/auth/login`, {
+          const res = await fetch(`${AUTH_BASE}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
             body: JSON.stringify({ email, password }),
@@ -58,7 +60,7 @@ export const useAuth = create<AuthState>()(
       },
     }),
     {
-      name: 'voicecrm-auth-session',
+      name: 'voicecrm-auth-v2',
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name);

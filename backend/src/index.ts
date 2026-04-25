@@ -6,6 +6,7 @@ import routes from './routes.js';
 import net from 'net';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
+import { authService } from './auth.js';
 
 dotenv.config();
 
@@ -194,6 +195,17 @@ const authGuard = (req: express.Request, res: express.Response, next: express.Ne
 // Root & Health
 app.get('/', (req, res) => res.json({ ok: true, service: 'whatsapp-crm-supabase' }));
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Public auth — no API key required
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const result = await authService.login(email, password);
+    if (!result) return res.status(401).json({ error: 'Invalid email or password' });
+    res.json({ success: true, token: result.token, user: result.user });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
 
 // Protected Routes
 app.use('/api', authGuard, routes);
