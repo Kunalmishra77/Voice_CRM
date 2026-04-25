@@ -901,28 +901,15 @@ const LeadsExplorerPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-4 max-w-[300px]">
                             {(rawStatus === 'callback' || rawStatus === 'call_back' || rawStatus === 'demo_booked') ? (() => {
-                              const summary = (lead as any)['Conversation Summary'] || '';
-                              const requestedTime = (() => {
-                                if (!summary) return null;
-                                const patterns: RegExp[] = [
-                                  /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
-                                  /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
-                                  /((?:tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm))?)/i,
-                                  /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
-                                  /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
-                                  /\b(next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week))\b/i,
-                                ];
-                                for (const p of patterns) { const m = summary.match(p); if (m) return (m[1] || m[0]).trim(); }
-                                return null;
-                              })();
                               const isDemo = rawStatus === 'demo_booked';
                               const accentColor = isDemo ? '#a78bfa' : '#f97316';
                               const bgColor = isDemo ? 'rgba(167,139,250,0.08)' : 'rgba(249,115,22,0.08)';
                               const borderColor = isDemo ? 'rgba(167,139,250,0.25)' : 'rgba(249,115,22,0.25)';
                               const label = isDemo ? 'Requested Demo Time' : 'Requested Callback Time';
+                              const requestedTime = (lead as any).callback_time || null;
                               return (
                                 <div className="flex flex-col gap-1.5">
-                                  <p className="text-sm text-muted-foreground line-clamp-1">{summary || '...'}</p>
+                                  <p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p>
                                   <div
                                     className="flex items-center gap-2 rounded-lg px-2.5 py-1.5"
                                     style={{ background: bgColor, border: `1px solid ${borderColor}` }}

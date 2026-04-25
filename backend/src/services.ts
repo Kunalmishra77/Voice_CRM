@@ -22,7 +22,9 @@ const COLS = {
     summary: 'Summary',        // capital S
     recording: 'recording_url',
     sentiment: 'Sentiment',    // capital S
-    lead_type: 'Type of Lead'  // singular (no 's'), "Eligilble" or "Non Eligible"
+    lead_type: 'Type of Lead',  // singular (no 's'), "Eligilble" or "Non Eligible"
+    callback_time: 'callback_time',       // requested demo/callback time (text)
+    callback_pending: 'callback_pending', // "yes" | "no"
     // NOTE: no created_at column in DB
   }
 };
@@ -239,7 +241,9 @@ export const conversationService = {
           "Bot Response": 'Voice Intercept',
           "Conversation Stage": row[COLS.leads.status],
           "recording_url": row[COLS.leads.recording] || null,
-          "callDate": callTimestampDisplay.substring(0, 10)
+          "callDate": callTimestampDisplay.substring(0, 10),
+          "callback_time": row[COLS.leads.callback_time] || null,
+          "callback_pending": row[COLS.leads.callback_pending] || null
         };
       })
       // Sort newest first by parsed call date then by Leadid desc

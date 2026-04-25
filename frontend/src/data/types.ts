@@ -43,6 +43,8 @@ export interface LeadInsightRow {
   duration?: string | number;
   recording_url?: string | null;
   lead_type?: string | null;
+  callback_time?: string | null;
+  callback_pending?: string | null;
 }
 
 export interface TrendPoint {

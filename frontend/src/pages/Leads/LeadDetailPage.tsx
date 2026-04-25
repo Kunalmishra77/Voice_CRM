@@ -411,8 +411,8 @@ const LeadDetailPage: React.FC = () => {
 
           {/* ── Callback / Demo scheduling info ───────────────────── */}
           {(isCallback || isDemoBooked) && (() => {
+            const requestedTime = (lead as any).callback_time || null;
             const summary = lead['Conversation Summary'] || '';
-            const requestedTime = extractRequestedTime(summary);
             const callDate = (() => {
               try {
                 const ts = lead.CallTimestamp || lead.created_at;
