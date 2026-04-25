@@ -26,7 +26,7 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
   const [form, setForm] = useState({ reason: '', note: '' });
 
   const updateStatusMutation = useMutation({
-    mutationFn: (data: { lead: LeadInsightRow; status: 'Converted' | 'NotInterested' | 'Closed'; reason: string; note: string }) => 
+    mutationFn: (data: { lead: LeadInsightRow; status: 'Converted' | 'NotInterested' | 'Closed'; reason: string; note: string }) =>
       dataApi.updateLeadStatus({
         lead: data.lead,
         status: data.status,
@@ -49,12 +49,15 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
         queryClient.invalidateQueries({ queryKey: ['dashboard-call-pulse'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-call-trend'] });
         queryClient.invalidateQueries({ queryKey: ['call-insight-detail'] });
-        toast.success(`Saved ✅ ${type === 'Converted' ? 'Marked as Converted' : 'Marked as Lost'}`);
+        toast.success(`Saved — ${type === 'Converted' ? 'Marked as Converted' : 'Marked as Lost'}`);
         onClose();
         setForm({ reason: '', note: '' });
       } else {
-        toast.error(res.message || 'Operation failed');
+        toast.error(res.message || 'Operation failed. Please try again.');
       }
+    },
+    onError: (e: any) => {
+      toast.error('Failed to update lead', { description: e?.message || 'Server error — please try again.' });
     }
   });
 
@@ -66,8 +69,8 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
       toast.error("Reason required", { description: "Please select a reason from the dropdown." });
       return;
     }
-    if (form.note.length < 10) {
-      toast.error("Note too short", { description: "Please provide at least 10 characters of context." });
+    if (form.note.length < 3) {
+      toast.error("Note too short", { description: "Please add a brief note (at least 3 characters)." });
       return;
     }
 
@@ -123,7 +126,7 @@ export const LeadWorkflowModals: React.FC<LeadWorkflowModalsProps> = ({
             <textarea
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
-              placeholder="Add at least 10 characters of context..."
+              placeholder="Add a brief note..."
               className="w-full h-32 bg-secondary border border-border rounded-2xl p-4 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
               required
             />

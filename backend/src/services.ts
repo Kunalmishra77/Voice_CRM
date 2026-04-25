@@ -54,6 +54,26 @@ function safeInt(v: any, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+/**
+ * Fetches ALL rows from a Supabase table by paginating with .range().
+ * Supabase PostgREST enforces a server-side max_rows limit that CANNOT be
+ * overridden with .limit() — only .range() pagination bypasses it.
+ */
+async function fetchAllRows(queryFactory: () => any): Promise<any[]> {
+  const BATCH = 1000;
+  const all: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryFactory().range(from, from + BATCH - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < BATCH) break;
+    from += BATCH;
+  }
+  return all;
+}
+
 /** Normalize raw sentiment from DB to consistent capitalized form */
 function normalizeSentiment(raw: any): string | null {
   if (!raw) return null;
@@ -193,8 +213,16 @@ export const conversationService = {
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
     // No created_at column — fetch all, filter by parsed call_date_time in memory
-    const { data, error } = await query.limit(10000000);
-    if (error) throw error;
+    // Use fetchAllRows to paginate around PostgREST server-side max_rows cap
+    let data: any[];
+    try {
+      data = await fetchAllRows(() => {
+        let bq = supabase.from(LEADS_TABLE).select('*');
+        if (q) bq = bq.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.summary}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
+        return bq;
+      });
+    } catch (err: any) { throw err; }
+    const error = null;
 
     const allRows = (data || [])
       .map(row => {
@@ -233,11 +261,12 @@ export const conversationService = {
       meta: { total: filtered.length, page: Number(page), limit: Number(limit) }
     };
   },
-  getContacts: async (filters: any) => {
-    const { data, error } = await supabase.from(LEADS_TABLE).select(`${COLS.leads.phone}, ${COLS.leads.name}, ${COLS.leads.status}`);
-    if (error) throw error;
+  getContacts: async (_filters: any) => {
+    const data = await fetchAllRows(() =>
+      supabase.from(LEADS_TABLE).select(`${COLS.leads.phone}, ${COLS.leads.name}, ${COLS.leads.status}`)
+    );
     const uniqueMap = new Map();
-    (data || []).forEach((row: any) => {
+    data.forEach((row: any) => {
       const phone = row[COLS.leads.phone];
       if (!uniqueMap.has(phone)) {
         uniqueMap.set(phone, { phone, name: row[COLS.leads.name], lastStage: row[COLS.leads.status], lastSeen: row[COLS.leads.timestamp] });
@@ -289,21 +318,29 @@ export const leadService = {
 
     if (q) query = query.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
 
-    // Fetch outcomes — source of truth for Converted/Lost (no date filter — permanent)
-    const { data: outcomesData, error: outcomesErr } = await supabase.from('crm_lead_outcomes').select('lead_id, outcome');
-    if (outcomesErr) console.warn('[leads] outcomes query warning:', outcomesErr.message);
+    // Fetch ALL outcomes — source of truth for Converted/Lost (paginated, no date filter)
+    let outcomesData: any[] = [];
+    try {
+      outcomesData = await fetchAllRows(() => supabase.from('crm_lead_outcomes').select('lead_id, outcome'));
+    } catch (e: any) { console.warn('[leads] outcomes query warning:', e.message); }
     const convertedLeadIds = new Set<string>();
     const lostLeadIds = new Set<string>();
-    (outcomesData || []).forEach((o: any) => {
+    outcomesData.forEach((o: any) => {
       if (o.outcome === 'Converted') convertedLeadIds.add(String(o.lead_id));
       else if (o.outcome === 'Lost') lostLeadIds.add(String(o.lead_id));
     });
     console.log('[leads] outcomes loaded — converted:', convertedLeadIds.size, 'lost:', lostLeadIds.size);
 
     // No created_at column — fetch all rows, filter by parsed call_date_time in memory
-    // .limit(10000000) overrides PostgREST's default 1000-row cap
-    const { data, error } = await query.limit(10000000);
-    if (error) { console.error('[leads] Supabase error:', error.message); throw error; }
+    // Use fetchAllRows to paginate around PostgREST server-side max_rows cap
+    let data: any[];
+    try {
+      data = await fetchAllRows(() => {
+        let bq = supabase.from(LEADS_TABLE).select('*');
+        if (q) bq = bq.or(`${COLS.leads.name}.ilike.%${q}%,${COLS.leads.phone}.ilike.%${q}%`);
+        return bq;
+      });
+    } catch (err: any) { console.error('[leads] Supabase error:', err.message); throw err; }
 
     const allRows = (data || [])
       .map(row => {
@@ -344,11 +381,12 @@ export const leadService = {
         return parseInt(String(b[COLS.leads.id] || 0)) - parseInt(String(a[COLS.leads.id] || 0));
       });
 
-    // 0. Always exclude leads that are currently queued/calling — they belong in Live Calling only.
-    //    Once their status changes (completed, failed, demo_booked, etc.) they appear here.
+    // 0. Exclude: (a) leads with null/empty status — not yet processed
+    //             (b) leads currently queued/calling — they belong in Live Calling only
     const LIVE_ONLY_STATUSES = ['to call', 'to_call', 'calling', 'ringing', 'in progress', 'in_progress', 'queued', 'scheduled'];
     const allRows_filtered = allRows.filter(row => {
       const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+      if (!rawSt) return false;
       return !LIVE_ONLY_STATUSES.includes(rawSt);
     });
 
@@ -364,14 +402,28 @@ export const leadService = {
       return true;
     });
 
-    // 2. Filter by Stage — uses effectiveStatus derived from outcomes table
+    // 2. Filter by Stage — outcomes table is source of truth; raw status is fallback
+    //    so leads converted before the outcomes table existed are still found
+    const CRM_CONVERTED_STATUSES = new Set(['crm_converted', 'converted']);
+    const CRM_LOST_STATUSES = new Set([CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES]);
     if (stage && stage !== 'all') {
       if (stage === 'Converted') {
-        filtered = filtered.filter(l => convertedLeadIds.has(l.leadid));
+        filtered = filtered.filter(l =>
+          convertedLeadIds.has(l.leadid) ||
+          CRM_CONVERTED_STATUSES.has(String(l[COLS.leads.status] || '').toLowerCase().trim())
+        );
       } else if (stage === 'Lost') {
-        filtered = filtered.filter(l => lostLeadIds.has(l.leadid));
+        filtered = filtered.filter(l =>
+          lostLeadIds.has(l.leadid) ||
+          CRM_LOST_STATUSES.has(String(l[COLS.leads.status] || '').toLowerCase().trim())
+        );
       } else if (stage === 'Pending') {
-        filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid));
+        filtered = filtered.filter(l =>
+          !convertedLeadIds.has(l.leadid) &&
+          !lostLeadIds.has(l.leadid) &&
+          !CRM_CONVERTED_STATUSES.has(String(l[COLS.leads.status] || '').toLowerCase().trim()) &&
+          !CRM_LOST_STATUSES.has(String(l[COLS.leads.status] || '').toLowerCase().trim())
+        );
       } else if (['Hot', 'Warm', 'Cold'].includes(stage)) {
         filtered = filtered.filter(l => !convertedLeadIds.has(l.leadid) && !lostLeadIds.has(l.leadid) && l.sentiment === stage);
       } else if (stage === 'DemoBooked') {
@@ -443,7 +495,13 @@ export const leadService = {
       outcome_date: today,
       created_by: 'Admin',
     }, { onConflict: 'lead_id' });
-    if (outcomeErr) console.warn('[outcomes] upsert warning:', outcomeErr.message);
+    if (outcomeErr) {
+      // Revert call_leads status so DB stays consistent with outcomes table
+      try {
+        await pool.query(`UPDATE public.call_leads SET status=$1 WHERE "Leadid"=$2`, ['pending', String(leadid)]);
+      } catch (_) {}
+      throw new Error(`Outcome record failed to save: ${outcomeErr.message}`);
+    }
 
     return { success: true };
   }
@@ -456,27 +514,27 @@ export const dashboardService = {
     const lead_type = filters.lead_type || null;
     console.log('[metrics] filters:', { date_from, date_to, lead_type });
 
-    // Fetch ALL outcomes — no date filter. Outcomes are permanent. A converted
-    // lead is ALWAYS converted regardless of what date range the user is viewing.
-    const { data: outcomesData, error: outcomesErr } = await supabase
-      .from('crm_lead_outcomes')
-      .select('lead_id, outcome');
-    if (outcomesErr) console.warn('[metrics] outcomes query warning:', outcomesErr.message);
+    // Fetch ALL outcomes — paginated, no date filter. Outcomes are permanent.
+    let outcomesData: any[] = [];
+    try {
+      outcomesData = await fetchAllRows(() => supabase.from('crm_lead_outcomes').select('lead_id, outcome'));
+    } catch (e: any) { console.warn('[metrics] outcomes query warning:', e.message); }
     const convertedIds = new Set<string>();
     const lostIds = new Set<string>();
-    (outcomesData || []).forEach((o: any) => {
+    outcomesData.forEach((o: any) => {
       if (o.outcome === 'Converted') convertedIds.add(String(o.lead_id));
       else if (o.outcome === 'Lost') lostIds.add(String(o.lead_id));
     });
     console.log('[metrics] outcomes loaded — converted:', convertedIds.size, 'lost:', lostIds.size);
 
     // Fetch all leads, filter by call date + lead_type in memory
-    // .limit(10000000) overrides PostgREST's default 1000-row cap
-    const { data, error } = await supabase
-      .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead", ${COLS.leads.summary}`)
-      .limit(10000000);
-    if (error) { console.error('[metrics] Supabase error:', error.message); throw error; }
+    // Use fetchAllRows to paginate around PostgREST server-side max_rows cap
+    let data: any[];
+    try {
+      data = await fetchAllRows(() =>
+        supabase.from(LEADS_TABLE).select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.phone}, ${COLS.leads.timestamp}, "Type of Lead", ${COLS.leads.summary}`)
+      );
+    } catch (err: any) { console.error('[metrics] Supabase error:', err.message); throw err; }
     const db_total = (data || []).length; // raw DB row count — always 100% of leads, ignores date filter
 
     // stage_counts only tracks active (non-outcome) leads in the date range
@@ -488,8 +546,10 @@ export const dashboardService = {
     const LIVE_ONLY_STATUSES_STATS = ['to call', 'to_call', 'calling', 'ringing', 'in progress', 'in_progress', 'queued', 'scheduled'];
     const filteredData = (data || []).filter(row => {
       const r = row as any;
-      // Exclude leads currently in the call queue / on a live call — they show in Live Calling only
+      // Exclude leads with null/empty status — not yet processed
       const rawSt = String(r[COLS.leads.status] || '').toLowerCase().trim();
+      if (!rawSt) return false;
+      // Exclude leads currently in the call queue / on a live call — they show in Live Calling only
       if (LIVE_ONLY_STATUSES_STATS.includes(rawSt)) return false;
       if (date_from || date_to) {
         const callTs = parseCallDateTime(r[COLS.leads.timestamp]);
@@ -506,13 +566,17 @@ export const dashboardService = {
       return true;
     });
 
+    const STATS_CONV_STATUSES = new Set(['crm_converted', 'converted']);
+    const STATS_LOST_STATUSES = new Set([CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES]);
     filteredData.forEach((row: any) => {
       const leadId = String(row[COLS.leads.id]);
       if (row[COLS.leads.phone]) phones.add(row[COLS.leads.phone]);
-      // Converted/Lost leads are counted from outcomes table — skip stage_counts
-      if (convertedIds.has(leadId)) { convertedInRange++; return; }
-      if (lostIds.has(leadId)) { lostInRange++; return; }
       const rawSt = String(row[COLS.leads.status] || '').toLowerCase().trim();
+      // Converted/Lost: outcomes table is primary; raw status is fallback for older records
+      const isConvertedRow = convertedIds.has(leadId) || STATS_CONV_STATUSES.has(rawSt);
+      const isLostRow = !isConvertedRow && (lostIds.has(leadId) || STATS_LOST_STATUSES.has(rawSt));
+      if (isConvertedRow) { convertedInRange++; return; }
+      if (isLostRow) { lostInRange++; return; }
       const isFailedSt = ['failed', 'error', 'no answer', 'no_answer'].includes(rawSt);
       if (rawSt === 'demo_booked') stage_counts.DemoBooked++;
       else if (rawSt === 'call_back' || rawSt === 'callback') stage_counts.Callback++;
@@ -526,11 +590,10 @@ export const dashboardService = {
     });
 
     const total = filteredData.length;
-    // Converted/Lost come directly from outcomes table — permanent, date-agnostic
-    const convertedCount = convertedIds.size;
-    const lostCount = lostIds.size;
-    // Pending = leads in range that are not converted, lost, failed, or callback
-    // (failed = no further work; callback = already being handled)
+    // convertedInRange / lostInRange already account for both outcomes table + raw status fallback
+    const convertedCount = convertedInRange;
+    const lostCount = lostInRange;
+    // Pending = leads in range that are not converted, lost, failed, callback, or demo_booked
     const pendingCount = total - convertedInRange - lostInRange - stage_counts.Failed - stage_counts.Callback - stage_counts.DemoBooked;
 
     // Lead type counts (DB column only — no keyword inference)
@@ -562,7 +625,7 @@ export const dashboardService = {
       total_leads: db_total,   // always the full DB count — never filtered by date
       filtered_total: total,   // count within the selected date range
       unique_phones: phones.size,
-      stage_counts: { ...stage_counts, Converted: convertedCount, Lost: lostCount },
+      stage_counts: { ...stage_counts, Converted: convertedInRange, Lost: lostInRange },
       bucket_counts
     };
   }
@@ -592,12 +655,12 @@ export const liveCallService = {
   getCallActivity: async () => {
     // Use IST date for "today" — server is UTC but calls are logged in IST
     const todayIST = new Date(Date.now() + IST_OFFSET_MS).toISOString().substring(0, 10);
-    const { data, error } = await supabase
-      .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
-      .limit(10000000);
-
-    if (error) { console.error('[live] error:', error.message); throw error; }
+    let data: any[];
+    try {
+      data = await fetchAllRows(() =>
+        supabase.from(LEADS_TABLE).select(`${COLS.leads.id}, ${COLS.leads.name}, ${COLS.leads.phone}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.duration}, ${COLS.leads.timestamp}`)
+      );
+    } catch (err: any) { console.error('[live] error:', err.message); throw err; }
 
     const allRows = (data || []).map((r: any) => {
       const callStatus = normalizeCallStatus(r[COLS.leads.status]);
@@ -619,18 +682,20 @@ export const liveCallService = {
       };
     });
 
-    // Queued/calling leads may have no timestamp yet — always include them regardless of date
-    // Completed/failed: only show today's calls in the live monitor
-    const queued  = allRows.filter(r => r.call_status === 'queued');
-    const calling = allRows.filter(r => r.call_status === 'calling');
-    const todayRows = allRows.filter(r => r.callDate === todayIST);
+    // Queued/calling/callback leads may have no timestamp — always include them regardless of date
+    // Completed/failed/demo_booked: only show today's calls in the live monitor
+    const queued    = allRows.filter(r => r.call_status === 'queued');
+    const calling   = allRows.filter(r => r.call_status === 'calling');
+    // Callbacks are date-agnostic: all callbacks in DB count toward totalToday
+    const callback  = allRows.filter(r => r.call_status === 'callback');
+    // For today's non-callback rows only
+    const todayRows = allRows.filter(r => r.callDate === todayIST && r.call_status !== 'callback');
     const completed  = todayRows.filter(r => r.call_status === 'completed');
     const failed     = todayRows.filter(r => r.call_status === 'failed');
     const demoBooked = todayRows.filter(r => r.call_status === 'demo_booked');
-    const callback   = todayRows.filter(r => r.call_status === 'callback');
 
-    // total_today = today's completed/failed + all currently active
-    const totalToday = todayRows.length + queued.length + calling.length;
+    // total_today = today's non-callback rows + all queued/calling/callbacks (date-agnostic)
+    const totalToday = todayRows.length + queued.length + calling.length + callback.length;
 
     return {
       summary: {
@@ -654,11 +719,12 @@ export const liveCallService = {
 export const debugService = {
   getTimestampDiagnosis: async () => {
     const IST_TODAY = new Date(Date.now() + IST_OFFSET_MS).toISOString().substring(0, 10);
-    const { data, error } = await supabase
-      .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.timestamp}, ${COLS.leads.status}`)
-      .limit(10000000);
-    if (error) throw error;
+    let data: any[];
+    try {
+      data = await fetchAllRows(() =>
+        supabase.from(LEADS_TABLE).select(`${COLS.leads.id}, ${COLS.leads.timestamp}, ${COLS.leads.status}`)
+      );
+    } catch (err: any) { throw err; }
 
     const dateDist: Record<string, number> = {};
     const todaySamples: any[] = [];
@@ -703,11 +769,7 @@ const DEFAULT_EMPLOYEES = [
 export const employeeService = {
   getAll: async () => {
     try {
-      // Try without ordering first (avoids failures if table schema has no created_at)
-      const { data, error } = await supabase
-        .from(EMPLOYEES_TABLE)
-        .select('*');
-      if (error) throw error;
+      const data = await fetchAllRows(() => supabase.from(EMPLOYEES_TABLE).select('*'));
       if (data && data.length > 0) {
         return data
           .map((e: any) => ({
@@ -775,14 +837,15 @@ export const taskService = {
     if (status === 'done') query = query.eq('done', true);
     else if (status === 'pending') query = query.eq('done', false);
 
-    const { data, error } = await query;
-    if (error) {
-      console.error('[tasks] Supabase error:', error.message);
-      // Table might not exist yet — return empty gracefully
+    let rawData: any[];
+    try {
+      rawData = await fetchAllRows(() => query);
+    } catch (err: any) {
+      console.error('[tasks] Supabase error:', err.message);
       return [];
     }
 
-    let tasks = (data || []).map((t: any) => ({
+    let tasks = rawData.map((t: any) => ({
       id: t.id?.toString() || t.lead_insights_id?.toString(),
       lead_insights_id: t.lead_insights_id,
       phone_number: t.phone_number,
@@ -932,20 +995,17 @@ const OUTCOMES_TABLE = 'crm_lead_outcomes';
 export const outcomeService = {
   getAll: async (filters: any = {}) => {
     const { outcome, q, date_from, date_to } = filters;
-    let query = supabase
-      .from(OUTCOMES_TABLE)
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (outcome && outcome !== 'all') query = query.eq('outcome', outcome);
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('[outcomes] fetch error:', error.message);
+    let rows: any[];
+    try {
+      rows = await fetchAllRows(() => {
+        let bq = supabase.from(OUTCOMES_TABLE).select('*').order('created_at', { ascending: false });
+        if (outcome && outcome !== 'all') bq = bq.eq('outcome', outcome);
+        return bq;
+      });
+    } catch (err: any) {
+      console.error('[outcomes] fetch error:', err.message);
       return [];
     }
-
-    let rows = data || [];
 
     if (q) {
       const lower = q.toLowerCase();
@@ -993,18 +1053,17 @@ export const outcomeService = {
     const { outcome, date_from, date_to } = filters;
     // Fetch ALL outcomes without PostgREST date filter — in-memory filter avoids
     // timezone mismatches with DATE columns (same approach as getAll).
-    let query = supabase
-      .from(OUTCOMES_TABLE)
-      .select('outcome, sentiment, outcome_date')
-      .order('outcome_date', { ascending: true });
-
-    if (outcome && outcome !== 'all') query = query.eq('outcome', outcome);
-
-    const { data, error } = await query;
-    if (error) { console.error('[outcomes] trend error:', error.message); return []; }
-
-    // Apply date filter in memory on normalized date strings
-    let rows = (data || []) as any[];
+    let rows: any[];
+    try {
+      rows = await fetchAllRows(() => {
+        let bq = supabase.from(OUTCOMES_TABLE).select('outcome, sentiment, outcome_date').order('outcome_date', { ascending: true });
+        if (outcome && outcome !== 'all') bq = bq.eq('outcome', outcome);
+        return bq;
+      });
+    } catch (err: any) {
+      console.error('[outcomes] trend error:', err.message);
+      return [];
+    }
     if (date_from) rows = rows.filter((r: any) => {
       const d = (r.outcome_date || '').substring(0, 10);
       return d >= date_from;
@@ -1026,13 +1085,16 @@ export const outcomeService = {
       ? [CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES]
       : [CRM_CONVERTED, 'converted', CRM_LOST, 'crm_lost', 'lost', ...LOST_STATUSES];
 
-    let leadsQuery = supabase
-      .from(LEADS_TABLE)
-      .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.timestamp}`)
-      .in(COLS.leads.status, statusFilter);
-
-    const { data: leads } = await leadsQuery;
-    if (!leads || leads.length === 0) return [];
+    let leads: any[];
+    try {
+      leads = await fetchAllRows(() =>
+        supabase
+          .from(LEADS_TABLE)
+          .select(`${COLS.leads.id}, ${COLS.leads.status}, ${COLS.leads.sentiment}, ${COLS.leads.timestamp}`)
+          .in(COLS.leads.status, statusFilter)
+      );
+    } catch (_) { return []; }
+    if (!leads.length) return [];
 
     return leads.map((r: any) => {
       const ts = parseCallDateTime(r[COLS.leads.timestamp]) || new Date().toISOString();

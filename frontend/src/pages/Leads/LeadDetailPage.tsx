@@ -23,7 +23,10 @@ import {
   Headphones,
   Play,
   Volume2,
-  Download
+  Download,
+  Clock,
+  CalendarClock,
+  AlarmClock
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -382,7 +385,74 @@ const LeadDetailPage: React.FC = () => {
 
         {/* Insights */}
         <div className="lg:col-span-8 space-y-8">
-           <SectionCard title="Call Analysis" subtitle="AI-processed voice interaction insights." icon={<Mic size={18} style={{ color: 'var(--brand-500)' }} />}>
+
+          {/* ── Callback / Demo scheduling info ───────────────────── */}
+          {(isCallback || isDemoBooked) && (() => {
+            const callDate = (() => {
+              try {
+                const ts = lead.CallTimestamp || lead.created_at;
+                if (!ts) return null;
+                const d = new Date(ts);
+                return isNaN(d.getTime()) ? null : d;
+              } catch { return null; }
+            })();
+            const title = isCallback ? 'Callback Request Details' : 'Demo Booking Details';
+            const subtitle = isCallback
+              ? 'The customer requested a callback during this call.'
+              : 'The customer booked a demo during this call.';
+            const accentColor = isCallback ? 'orange' : 'violet';
+            const Icon = isCallback ? AlarmClock : CalendarClock;
+            const borderClass = isCallback
+              ? 'border-orange-500/20 bg-orange-500/5'
+              : 'border-violet-500/20 bg-violet-500/5';
+            const iconColor = isCallback ? '#f97316' : '#a78bfa';
+
+            return (
+              <SectionCard
+                title={title}
+                subtitle={subtitle}
+                icon={<Icon size={18} style={{ color: iconColor }} />}
+              >
+                <div className={`space-y-4 p-4 rounded-2xl border ${borderClass}`}>
+                  {/* When the request was made */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center shrink-0">
+                      <Clock size={14} className="text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                        {isCallback ? 'Callback Requested On' : 'Demo Booked On'}
+                      </p>
+                      <p className="text-sm font-bold text-foreground">
+                        {callDate ? format(callDate, 'EEEE, MMM dd yyyy · hh:mm a') : 'Time not recorded'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* What the customer said */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center shrink-0 mt-0.5">
+                      <MessageSquare size={14} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                        What the Customer Said
+                      </p>
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        {lead['Conversation Summary'] || 'No call summary available.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground/60 pl-11 italic">
+                    The exact {isCallback ? 'callback time' : 'demo date'} requested by the customer is mentioned in their statement above.
+                  </p>
+                </div>
+              </SectionCard>
+            );
+          })()}
+
+          <SectionCard title="Call Analysis" subtitle="AI-processed voice interaction insights." icon={<Mic size={18} style={{ color: 'var(--brand-500)' }} />}>
               <div className="space-y-8 py-4">
                  <div className="space-y-4">
                     <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-2">

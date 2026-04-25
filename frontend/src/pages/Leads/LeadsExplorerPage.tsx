@@ -899,7 +899,22 @@ const LeadsExplorerPage: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 max-w-[300px]"><p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p></td>
+                          <td className="px-4 py-4 max-w-[300px]">
+                            <p className="text-sm text-muted-foreground line-clamp-1">{lead['Conversation Summary'] || '...'}</p>
+                            {(rawStatus === 'callback' || rawStatus === 'call_back' || rawStatus === 'demo_booked') && (() => {
+                              const ts = (lead as any).CallTimestamp || (lead as any).created_at;
+                              if (!ts) return null;
+                              try {
+                                const d = new Date(ts);
+                                if (isNaN(d.getTime())) return null;
+                                return (
+                                  <p className="text-[10px] font-semibold mt-1" style={{ color: rawStatus === 'demo_booked' ? '#a78bfa' : '#f97316' }}>
+                                    {rawStatus === 'demo_booked' ? 'Demo booked' : 'Callback requested'} · {format(d, 'MMM dd, yyyy · hh:mm a')}
+                                  </p>
+                                );
+                              } catch { return null; }
+                            })()}
+                          </td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {!isFinalized && (
