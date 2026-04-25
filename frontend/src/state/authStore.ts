@@ -2,67 +2,72 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export interface User {
+  id: string;
   name: string;
   email: string;
-  role: string;
+  role: 'admin' | 'employee';
   avatar?: string;
 }
 
 interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
-  login: (email: string, password?: string) => Promise<boolean>;
+  token: string | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
+
+const BASE = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://localhost:3010/api';
+const API_KEY = (import.meta.env.VITE_API_KEY as string) || 'dev_key_2026';
 
 export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
       isAuthenticated: false,
       user: null,
+      token: null,
       login: async (email, password) => {
-        // Simulate real API authentication with 1.5s delay
         try {
-          return await new Promise((resolve) => {
-            setTimeout(() => {
-              if (email === 'admin@voicecrm.app' && (password === 'password123' || !password)) {
-                const mockUser: User = {
-                  name: 'Kunal',
-                  email: 'admin@voicecrm.app',
-                  role: 'Manager',
-                };
-                set({ isAuthenticated: true, user: mockUser });
-                resolve(true);
-              } else {
-                resolve(false);
-              }
-            }, 1500);
+          const res = await fetch(`${BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+            body: JSON.stringify({ email, password }),
           });
-        } catch (e) {
-          console.error("Auth error:", e);
+          if (!res.ok) return false;
+          const data = await res.json();
+          if (data.success && data.token) {
+            set({
+              isAuthenticated: true,
+              token: data.token,
+              user: {
+                id: data.user.id,
+                name: data.user.name,
+                email: data.user.email,
+                role: data.user.role,
+              },
+            });
+            return true;
+          }
+          return false;
+        } catch {
           return false;
         }
       },
       logout: () => {
-        set({ isAuthenticated: false, user: null });
+        set({ isAuthenticated: false, user: null, token: null });
       },
     }),
-    { 
+    {
       name: 'voicecrm-auth-session',
-      // Ensure we don't persist complex objects if they were there
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name);
           if (!str) return null;
-          try {
-            return JSON.parse(str);
-          } catch (e) {
-            return null;
-          }
+          try { return JSON.parse(str); } catch { return null; }
         },
         setItem: (name, value) => localStorage.setItem(name, JSON.stringify(value)),
         removeItem: (name) => localStorage.removeItem(name),
-      }
+      },
     }
   )
 );

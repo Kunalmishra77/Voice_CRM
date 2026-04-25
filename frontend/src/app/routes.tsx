@@ -36,34 +36,42 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  if (user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 export const AppRoutes: React.FC = () => {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        
+
         <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<Navigate to="/" replace />} />
-          
-          {/* Leads */}
+
+          {/* Leads — all roles */}
           <Route path="leads" element={<LeadsExplorerPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
-          
-          {/* Calls */}
-          <Route path="calls" element={<CallsPage />} />
-          
-          {/* Workflow */}
-          <Route path="live-calls" element={<LiveCallsPage />} />
-          <Route path="call-insights" element={<CallInsightsPage />} />
+
+          {/* Tasks — all roles (employees see their own) */}
           <Route path="tasks" element={<TasksFollowupsPage />} />
-          
-          {/* Ops */}
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="exports" element={<ExportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+
+          {/* Admin-only routes */}
+          <Route path="calls" element={<AdminRoute><CallsPage /></AdminRoute>} />
+          <Route path="live-calls" element={<AdminRoute><LiveCallsPage /></AdminRoute>} />
+          <Route path="call-insights" element={<AdminRoute><CallInsightsPage /></AdminRoute>} />
+          <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
+          <Route path="exports" element={<AdminRoute><ExportsPage /></AdminRoute>} />
+          <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+
+          {/* Profile — all roles */}
           <Route path="profile" element={<ProfilePage />} />
-          
+
           {/* Fallback */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>

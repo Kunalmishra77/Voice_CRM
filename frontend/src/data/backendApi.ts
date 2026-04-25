@@ -23,10 +23,15 @@ function buildUrl(path: string, params?: Record<string, any>): string {
 
 /** Common headers sent with every request */
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
-    return {
-        'x-api-key': API_KEY,
-        ...extra,
-    };
+    const headers: Record<string, string> = { 'x-api-key': API_KEY, ...extra };
+    try {
+        const stored = localStorage.getItem('voicecrm-auth-session');
+        if (stored) {
+            const token = JSON.parse(stored)?.state?.token;
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+        }
+    } catch {}
+    return headers;
 }
 
 async function handleResponse(res: Response) {

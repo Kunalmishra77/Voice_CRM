@@ -13,14 +13,21 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../state/themeStore';
+import { useAuth } from '../state/authStore';
 
-const NAV_ITEMS = [
+const ADMIN_NAV = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/calls', label: 'Calls', icon: PhoneCall },
   { path: '/call-insights', label: 'Insights', icon: Activity },
   { path: '/leads', label: 'Leads', icon: Users },
   { path: '/tasks', label: 'Tasks', icon: ListTodo },
   { path: '/settings', label: 'Settings', icon: Settings },
+];
+
+const EMPLOYEE_NAV = [
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/leads', label: 'Leads', icon: Users },
+  { path: '/tasks', label: 'My Tasks', icon: ListTodo },
 ];
 
 interface SidebarProps {
@@ -30,6 +37,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const NAV_ITEMS = user?.role === 'admin' ? ADMIN_NAV : EMPLOYEE_NAV;
 
   return (
     <aside

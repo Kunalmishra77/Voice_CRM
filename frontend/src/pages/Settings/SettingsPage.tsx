@@ -1,23 +1,65 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Settings, Moon, Sun, Bell, Cpu, Clock,
   PhoneCall, Flame, ClipboardList, Activity,
-  RefreshCw, Shield, Timer, Volume2, Trash2, Database
+  RefreshCw, Shield, Timer, Volume2, Trash2, Database,
+  Users, UserPlus, Mail, Lock, Crown, UserCheck, X, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { PageShell } from '../../ui/PageShell';
 import { SectionCard } from '../../ui/SectionCard';
 import { Button } from '../../ui/Button';
 import { useTheme } from '../../state/themeStore';
 import { useNotificationStore } from '../../state/notificationStore';
+import { useAuth } from '../../state/authStore';
+import { bGet, bPost, bDelete } from '../../data/backendApi';
 import { cn } from '../../lib/utils';
 
 const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { prefs, updatePrefs, notifications, clearAll } = useNotificationStore();
+  const { user: authUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Team Members state
+  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', role: 'employee' as 'admin' | 'employee' });
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['auth-users'],
+    queryFn: () => bGet('/auth/users'),
+    enabled: authUser?.role === 'admin',
+  });
+  const teamMembers: any[] = usersData?.users || [];
+
+  const createMemberMutation = useMutation({
+    mutationFn: (data: { name: string; email: string; password: string; role: string }) =>
+      bPost('/auth/users', data),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(`${newMember.name} added successfully`);
+        setNewMember({ name: '', email: '', password: '', role: 'employee' });
+        setShowAddForm(false);
+        queryClient.invalidateQueries({ queryKey: ['auth-users'] });
+      } else {
+        toast.error(res.error || 'Failed to add member');
+      }
+    },
+    onError: (e: any) => toast.error(e?.message || 'Failed to add member'),
+  });
+
+  const deleteMemberMutation = useMutation({
+    mutationFn: (id: string) => bDelete(`/auth/users/${id}`),
+    onSuccess: () => {
+      toast.success('Member removed');
+      queryClient.invalidateQueries({ queryKey: ['auth-users'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Failed to remove member'),
+  });
 
   return (
     <PageShell>
@@ -32,6 +74,143 @@ const SettingsPage: React.FC = () => {
 
         {/* ── LEFT COLUMN ─────────────────────────────── */}
         <div className="lg:col-span-7 flex flex-col gap-8">
+
+          {/* Team Members (Admin only) */}
+          {authUser?.role === 'admin' && (
+            <SectionCard title="Team Members" subtitle="Add and manage employee login accounts." icon={<Users size={18} className="text-primary" />}>
+              <div className="space-y-4 py-2">
+
+                {/* Member list */}
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {teamMembers.map((member: any) => (
+                      <div key={member.id} className="flex items-center justify-between p-4 rounded-2xl bg-secondary/40 border border-border/50 group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-9 h-9 rounded-xl flex items-center justify-center border text-xs font-black",
+                            member.role === 'admin'
+                              ? "bg-amber-500/10 border-amber-500/20 text-amber-500"
+                              : "bg-primary/10 border-primary/20 text-primary"
+                          )}>
+                            {member.role === 'admin' ? <Crown size={14} /> : <UserCheck size={14} />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{member.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">{member.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={cn(
+                            "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
+                            member.role === 'admin'
+                              ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                              : "text-primary bg-primary/10 border-primary/20"
+                          )}>
+                            {member.role}
+                          </span>
+                          {member.email !== authUser.email && (
+                            <button
+                              onClick={() => deleteMemberMutation.mutate(member.id)}
+                              disabled={deleteMemberMutation.isPending}
+                              className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground/40 hover:bg-rose-500/10 hover:text-rose-500 transition-all cursor-pointer"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Member Form */}
+                {showAddForm ? (
+                  <div className="p-5 rounded-2xl bg-secondary/60 border border-primary/20 space-y-4">
+                    <p className="text-xs font-bold text-foreground uppercase tracking-wider">New Team Member</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Full Name</label>
+                        <input
+                          value={newMember.name}
+                          onChange={e => setNewMember(p => ({ ...p, name: e.target.value }))}
+                          placeholder="Simran Kaur"
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Role</label>
+                        <select
+                          value={newMember.role}
+                          onChange={e => setNewMember(p => ({ ...p, role: e.target.value as 'admin' | 'employee' }))}
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                          <option value="employee">Employee</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Email</label>
+                      <div className="relative">
+                        <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
+                        <input
+                          type="email"
+                          value={newMember.email}
+                          onChange={e => setNewMember(p => ({ ...p, email: e.target.value }))}
+                          placeholder="employee@company.com"
+                          className="w-full bg-background border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Password</label>
+                      <div className="relative">
+                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
+                        <input
+                          type="password"
+                          value={newMember.password}
+                          onChange={e => setNewMember(p => ({ ...p, password: e.target.value }))}
+                          placeholder="Set a secure password"
+                          className="w-full bg-background border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 pt-1">
+                      <Button
+                        variant="primary"
+                        className="flex-1 py-3 rounded-xl text-sm"
+                        loading={createMemberMutation.isPending}
+                        onClick={() => {
+                          if (!newMember.name.trim() || !newMember.email.trim() || !newMember.password.trim()) {
+                            toast.error('All fields are required');
+                            return;
+                          }
+                          createMemberMutation.mutate(newMember);
+                        }}
+                      >
+                        Add Member
+                      </Button>
+                      <Button variant="ghost" className="px-6 py-3 rounded-xl" onClick={() => setShowAddForm(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full py-5 rounded-2xl border-dashed border-2 border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all text-sm font-bold text-muted-foreground hover:text-primary"
+                    onClick={() => setShowAddForm(true)}
+                  >
+                    <UserPlus size={16} className="mr-2" /> Add New Team Member
+                  </Button>
+                )}
+              </div>
+            </SectionCard>
+          )}
 
           {/* Appearance */}
           <SectionCard title="Appearance" subtitle="Customize the interface." icon={<Sun size={18} className="text-primary" />}>

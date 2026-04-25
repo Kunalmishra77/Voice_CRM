@@ -8,8 +8,8 @@ import { Button } from '../../ui/Button';
 import { useTheme } from '../../state/themeStore';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('admin@voicecrm.app');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -183,7 +183,7 @@ const LoginPage: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#0d121f]/50 border border-white/[0.05] group-focus-within:border-primary/40 group-focus-within:bg-[#0d121f] rounded-2xl py-4 pl-14 pr-5 text-[15px] font-bold text-white focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-muted-foreground/20"
-                  placeholder="admin@voicecrm.app"
+                  placeholder="your@email.com"
                   required
                 />
               </div>

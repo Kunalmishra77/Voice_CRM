@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import routes from './routes.js';
 import net from 'net';
 import pg from 'pg';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -76,15 +77,53 @@ async function runMigrations() {
 
     // Add ALL required columns to crm_employees
     const alterEmpCols = [
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS name        TEXT`,
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS email       TEXT DEFAULT ''`,
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS role        TEXT DEFAULT 'employee'`,
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS phone       TEXT DEFAULT ''`,
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS department  TEXT DEFAULT ''`,
-      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS created_at  TIMESTAMPTZ DEFAULT NOW()`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS name          TEXT`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS email         TEXT DEFAULT ''`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS role          TEXT DEFAULT 'employee'`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS phone         TEXT DEFAULT ''`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS department    TEXT DEFAULT ''`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS created_at    TIMESTAMPTZ DEFAULT NOW()`,
+      `ALTER TABLE public.crm_employees ADD COLUMN IF NOT EXISTS password_hash TEXT`,
     ];
     for (const sql of alterEmpCols) {
       await client.query(sql).catch(() => {});
+    }
+
+    // Add unique constraint on email (safe — skips if already exists)
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'crm_employees_email_unique') THEN
+          ALTER TABLE public.crm_employees ADD CONSTRAINT crm_employees_email_unique UNIQUE (email);
+        END IF;
+      END $$;
+    `).catch(() => {});
+
+    // Seed initial admin/employee accounts (only if they don't exist yet)
+    const seedUsers = [
+      { name: 'Kunal',  email: 'aiagentix2025@gmail.com',   role: 'admin',    password: 'Vintaqe@123' },
+      { name: 'Admin',  email: 'support@vmsolutions.co.in', role: 'admin',    password: 'Vintaqe@123' },
+      { name: 'Simran', email: 'pagarbook.vms@gmail.com',   role: 'employee', password: 'PagarBook@123' },
+    ];
+    for (const u of seedUsers) {
+      const { rows } = await client.query(
+        `SELECT id, password_hash FROM public.crm_employees WHERE LOWER(email) = $1`,
+        [u.email.toLowerCase()]
+      );
+      if (!rows.length) {
+        const hash = await bcrypt.hash(u.password, 10);
+        await client.query(
+          `INSERT INTO public.crm_employees (name, email, role, password_hash) VALUES ($1, $2, $3, $4)`,
+          [u.name, u.email.toLowerCase(), u.role, hash]
+        );
+        console.log(`[migration] Seeded user: ${u.email} (${u.role})`);
+      } else if (!rows[0].password_hash) {
+        const hash = await bcrypt.hash(u.password, 10);
+        await client.query(
+          `UPDATE public.crm_employees SET password_hash=$1, role=$2, name=$3 WHERE LOWER(email)=$4`,
+          [hash, u.role, u.name, u.email.toLowerCase()]
+        );
+        console.log(`[migration] Updated password for: ${u.email}`);
+      }
     }
 
     await client.query(`

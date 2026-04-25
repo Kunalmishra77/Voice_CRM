@@ -1,11 +1,56 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { conversationService, leadService, dashboardService, proxyService, taskService, employeeService, liveCallService, outcomeService } from './services.js';
+import { authService } from './auth.js';
 
 const router = Router();
 
 // Health check
 router.get('/health', async (req, res) => {
   res.json({ ok: true, database: 'connected', signal: 'green' });
+});
+
+// ─── Auth Middleware ─────────────────────────────────────────────
+const adminOnly = (req: Request, res: Response, next: NextFunction) => {
+  const user = authService.verifyToken(req.headers.authorization);
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  (req as any).authUser = user;
+  next();
+};
+
+// ─── Auth Endpoints ──────────────────────────────────────────────
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const result = await authService.login(email, password);
+    if (!result) return res.status(401).json({ error: 'Invalid email or password' });
+    res.json({ success: true, token: result.token, user: result.user });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/auth/users', adminOnly, async (req, res) => {
+  try {
+    const users = await authService.listUsers();
+    res.json({ success: true, users });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/auth/users', adminOnly, async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password are required' });
+    const user = await authService.createUser({ name, email, password, role });
+    res.json({ success: true, user });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/auth/users/:id', adminOnly, async (req, res) => {
+  try {
+    const deleted = await authService.deleteUser(req.params.id);
+    res.json({ success: true, deleted });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // Metrics

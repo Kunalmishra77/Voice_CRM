@@ -53,6 +53,7 @@ import { cn, safeFormat, safeParseISO } from '../../lib/utils';
 import { PageShell } from '../../ui/PageShell';
 import type { LeadTask, Employee } from '../../data/types';
 import { bPost } from '../../data/backendApi';
+import { useAuth } from '../../state/authStore';
 
 // ─── Constants ──────────────────────────────────────────────────
 
@@ -202,6 +203,8 @@ const TasksFollowupsPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { dateRange } = useGlobalFilters();
+  const { user: authUser } = useAuth();
+  const isEmployee = authUser?.role === 'employee';
 
   // --- State ---
   const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('pending');
@@ -239,10 +242,12 @@ const TasksFollowupsPage: React.FC = () => {
     queryFn: () => (dataProvider as any).getEmployees(),
   });
 
+  const effectiveEmployeeFilter = isEmployee ? (authUser?.id ?? 'all') : employeeFilter;
+
   const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useQuery<LeadTask[]>({
-    queryKey: ['tasks', employeeFilter],
+    queryKey: ['tasks', effectiveEmployeeFilter],
     queryFn: () => (dataProvider as any).getTasks(dateRange, {
-      assigned_to: employeeFilter !== 'all' ? employeeFilter : undefined,
+      assigned_to: effectiveEmployeeFilter !== 'all' ? effectiveEmployeeFilter : undefined,
     }),
   });
 
