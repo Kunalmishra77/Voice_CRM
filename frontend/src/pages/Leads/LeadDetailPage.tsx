@@ -101,29 +101,6 @@ const LeadDetailPage: React.FC = () => {
     );
   }
 
-  // Try to extract the callback/demo time the customer requested from the summary text
-  function extractRequestedTime(summary: string): string | null {
-    if (!summary) return null;
-    const patterns: RegExp[] = [
-      // Full date + time: "25th April at 3 PM", "April 25 at 3:30 PM"
-      /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
-      /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+\d{4})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)\b/i,
-      // Day + time: "tomorrow at 5 PM", "Monday at 3:30 PM"
-      /((?:tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm))?)/i,
-      // "at 3 PM", "at 3:30 PM"
-      /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
-      // Standalone time: "3 PM", "5:30 PM"
-      /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
-      // "next Monday/week"
-      /\b(next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month))\b/i,
-    ];
-    for (const pattern of patterns) {
-      const match = summary.match(pattern);
-      if (match) return (match[1] || match[0]).trim();
-    }
-    return null;
-  }
-
   const rawStatus = String((lead as any).status || (lead as any)['lead stage'] || '').toLowerCase().trim();
   const isConverted = ['crm_converted', 'converted'].includes(rawStatus);
   const isLost = ['crm_lost', 'lost', 'not interested', 'wrong number', 'busy', 'voicemail'].includes(rawStatus);
